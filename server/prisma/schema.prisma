@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Room {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  shifts    Shift[]
+}
+
+model Therapist {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  shifts    Shift[]
+}
+
+model Shift {
+  id          Int       @id @default(autoincrement())
+  therapistId Int
+  roomId      Int
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  therapist   Therapist @relation(fields: [therapistId], references: [id])
+  room        Room      @relation(fields: [roomId], references: [id])
+
+  @@index([therapistId])
+  @@index([roomId])
+}
