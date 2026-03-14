@@ -47,9 +47,16 @@ export default function MySchedulePage() {
 
   // Group by date
   const grouped = useMemo(() => {
-    const todayStr = toDateStr(new Date());
+    const now = new Date();
+    const todayStr = toDateStr(now);
+    const currentHour = now.getHours();
     const filtered = filter === 'upcoming'
-      ? slots.filter(s => toDateStr(new Date(s.date)) >= todayStr)
+      ? slots.filter(s => {
+          const dateStr = toDateStr(new Date(s.date));
+          if (dateStr > todayStr) return true;           // future dates
+          if (dateStr === todayStr) return s.endHour > currentHour; // today: only if not ended
+          return false;                                  // past dates
+        })
       : slots;
     const map = {};
     filtered.forEach(s => {
