@@ -314,7 +314,7 @@ export default function DashboardPage(){
           {view==='grid'?(
             rooms.length===0
               ?<div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
-              :<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" >
                 {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
           ):<TimelineView rooms={rooms} slots={slots}/>}
