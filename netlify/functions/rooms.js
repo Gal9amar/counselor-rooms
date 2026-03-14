@@ -21,19 +21,13 @@ exports.handler = async (event) => {
           },
         },
       });
-
       const result = rooms.map((room) => ({
         id: room.id,
         name: room.name,
         activeShift: room.shifts[0]
-          ? {
-              id: room.shifts[0].id,
-              therapist: room.shifts[0].therapist,
-              startTime: room.shifts[0].startTime,
-            }
+          ? { id: room.shifts[0].id, therapist: room.shifts[0].therapist, startTime: room.shifts[0].startTime }
           : null,
       }));
-
       return ok(result);
     }
 
@@ -44,6 +38,15 @@ exports.handler = async (event) => {
       if (!name) return err('שם חדר נדרש', 400);
       const room = await prisma.room.create({ data: { name } });
       return ok(room, 201);
+    }
+
+    // PATCH /api/rooms/:id (admin)
+    if (httpMethod === 'PATCH' && isIdPath) {
+      if (!checkAdmin(headers)) return err('Unauthorized', 401);
+      const { name } = JSON.parse(body || '{}');
+      if (!name) return err('שם חדר נדרש', 400);
+      const room = await prisma.room.update({ where: { id: parseInt(id) }, data: { name } });
+      return ok(room);
     }
 
     // DELETE /api/rooms/:id (admin)
