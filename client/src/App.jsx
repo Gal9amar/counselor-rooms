@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
-import ShiftPage from './pages/ShiftPage';
 import SchedulePage from './pages/SchedulePage';
 import HistoryPage from './pages/HistoryPage';
 import AdminPage from './pages/AdminPage';
@@ -13,7 +12,6 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/shift" element={<ShiftPage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/admin" element={<AdminPage />} />
