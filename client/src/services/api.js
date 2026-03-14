@@ -30,6 +30,12 @@ export const getActiveShift = (therapistId) =>
 export const getHistory = (therapistId) =>
   api.get('/shifts/history', { params: therapistId ? { therapistId } : {} }).then((r) => r.data);
 
+// Schedule
+export const getSchedule = () => api.get('/schedule').then((r) => r.data);
+export const bookSlot = (roomId, dayOfWeek, therapistId) =>
+  api.post('/schedule', { roomId, dayOfWeek, therapistId }).then((r) => r.data);
+export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
+
 // Admin
 export const verifyAdmin = (password) =>
   api.post('/admin/verify', { password }).then((r) => r.data);
