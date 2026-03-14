@@ -4,7 +4,7 @@ import { LayoutDashboard, Clock, History, Settings, Menu, X } from 'lucide-react
 
 const navItems = [
   { to: '/', label: 'דשבורד', icon: LayoutDashboard },
-  { to: '/shift', label: 'משמרת', icon: Clock },
+  { to: '/shift', label: 'רישום לחדר', icon: Clock },
   { to: '/history', label: 'היסטוריה', icon: History },
   { to: '/admin', label: 'מנהל', icon: Settings },
 ];
