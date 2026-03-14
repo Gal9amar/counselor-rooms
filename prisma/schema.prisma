@@ -30,6 +30,7 @@ model ScheduleSlot {
   startHour   Int      // 8..21
   endHour     Int      // 9..22
   therapistId Int
+  note        String?  // הערה אופציונלית
   createdAt   DateTime @default(now())
   room        Room     @relation(fields: [roomId], references: [id])
   therapist   Therapist @relation(fields: [therapistId], references: [id])
