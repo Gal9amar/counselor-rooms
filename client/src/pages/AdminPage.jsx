@@ -126,10 +126,29 @@ export default function AdminPage(){
   const handleLogin=async()=>{try{await verifyAdmin(password);sessionStorage.setItem('adminPass',password);setAdminPassword(password);setAuthed(true);}catch{setAuthError('סיסמה שגויה');}};
   const addR=async()=>{if(!newRoom.trim())return;try{await addRoom(newRoom.trim());setNewRoom('');setError('');setRooms(await getRooms());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
   const renR=async(id,n)=>{try{await updateRoom(id,n);setRooms(p=>p.map(r=>r.id===id?{...r,name:n}:r));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
-  const delR=async(id)=>{if(!confirm('למחוק?'))return;try{await deleteRoom(id);setRooms(rooms.filter(r=>r.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
+  const delR=async(id)=>{
+    const r=rooms.find(r=>r.id===id);
+    const cnt=slots.filter(s=>s.roomId===id).length;
+    const msg=cnt>0
+      ?`לחדר "${r?.name}" יש ${cnt} שיבוצים.\nמחיקתו תמחק גם את כל השיבוצים שלו.\nלהמשיך?`
+      :`למחוק את "${r?.name}"?`;
+    if(!confirm(msg))return;
+    try{await deleteRoom(id);setRooms(rooms.filter(r=>r.id!==id));setSlots(slots.filter(s=>s.roomId!==id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
   const addT=async()=>{if(!newTherapist.trim())return;try{await addTherapist(newTherapist.trim());setNewTherapist('');setError('');setTherapists(await getTherapists());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
   const renT=async(id,n)=>{try{await updateTherapist(id,n);setTherapists(p=>p.map(t=>t.id===id?{...t,name:n}:t));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
-  const delT=async(id)=>{if(!confirm('למחוק?'))return;try{await deleteTherapist(id);setTherapists(therapists.filter(t=>t.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
+  const delT=async(id)=>{
+    const t=therapists.find(t=>t.id===id);
+    const slotRes=await fetch(`/api/schedule?from=2020-01-01&to=2030-12-31`).then(r=>r.json()).catch(()=>[]);
+    const cnt=Array.isArray(slotRes)?slotRes.filter(s=>s.therapistId===id).length:0;
+    const msg=cnt>0
+      ?`למטפל "${t?.name}" יש ${cnt} שיבוצים.\nמחיקתו תמחק גם את כל השיבוצים שלו.\nלהמשיך?`
+      :`למחוק את "${t?.name}"?`;
+    if(!confirm(msg))return;
+    try{await deleteTherapist(id);setTherapists(therapists.filter(t=>t.id!==id));setSlots(slots.filter(s=>s.therapistId!==id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
   const saveSlot=async(id,sh,eh,tid,nt)=>{const u=await updateSlot(id,sh,eh,tid,nt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
   const delSlot=async(id)=>{if(!confirm('למחוק?'))return;try{await clearSlot(id);setSlots(slots.filter(s=>s.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
 
