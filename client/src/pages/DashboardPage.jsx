@@ -156,48 +156,72 @@ function TimelineView({rooms,slots}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
   const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
-  const todayRooms=rooms.map(room=>({...room,daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour)}));
+  const ROOM_COL=112; // px, matches w-28
+
+  const todayRooms=rooms.map(room=>({
+    ...room,
+    daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour)
+  }));
+
+  // pct: 0% = 8:00 (left), 100% = 21:00 (right)
+  const pct=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
+
   return(
-    <div className="card rounded-2xl overflow-hidden fade-up">
-      <div className="flex border-b border-gray-100 bg-gray-50" dir="ltr">
-        <div className="flex-1 relative h-9">
+    <div className="card rounded-2xl overflow-hidden fade-up" style={{direction:'ltr'}}>
+      {/* Header row */}
+      <div className="flex border-b border-gray-100 bg-gray-50" style={{direction:'ltr'}}>
+        {/* Timeline axis */}
+        <div className="flex-1 relative h-9 border-r border-gray-100">
           {HOURS.map(h=>(
-            <div key={h} className="absolute top-0 text-xs text-gray-400 -translate-x-1/2" style={{left:`${((h-HOURS[0])/totalHours)*100}%`}}>
-              <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>{hLabel(h)}
+            <div key={h} className="absolute top-0 text-xs text-gray-400" style={{left:pct(h),transform:'translateX(-50%)'}}>
+              <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>
+              {hLabel(h)}
             </div>
           ))}
         </div>
-        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium text-right">חדר</div>
+        {/* Room column header */}
+        <div style={{width:ROOM_COL,flexShrink:0}} className="px-4 py-2.5 text-xs text-gray-400 font-medium text-center">חדר</div>
       </div>
+
+      {/* Data rows */}
       {todayRooms.map((room,ri)=>(
-        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`} dir="ltr">
-          <div className="flex-1 relative h-10 my-1">
+        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`} style={{direction:'ltr'}}>
+          {/* Bar area */}
+          <div className="flex-1 relative h-10 my-1 border-r border-gray-100">
+            {/* Now line */}
             {nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
-              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10 shadow-sm" style={{left:`${((nowDecimal-HOURS[0])/totalHours)*100}%`}}/>
+              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10" style={{left:pct(nowDecimal)}}/>
             )}
+            {/* Slots */}
             {room.daySlots.map(s=>{
-              const left=((s.startHour-HOURS[0])/totalHours)*100;
-              const width=((s.endHour-s.startHour)/totalHours)*100;
               const isNow=nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+              const isPast=s.endHour<=nowDecimal;
               return(
                 <div key={s.id}
                   className={`absolute top-1 bottom-1 rounded-lg flex items-center px-2 text-xs font-medium overflow-hidden ${
                     isNow?'bg-gradient-to-r from-green-500 to-green-400 text-white shadow-md shadow-green-200'
-                    :s.startHour>nowDecimal?'bg-green-100 text-green-700 border border-green-200'
-                    :'bg-gray-100 text-gray-400'
+                    :isPast?'bg-gray-100 text-gray-400'
+                    :'bg-green-100 text-green-700 border border-green-200'
                   }`}
-                  style={{left:`${left}%`,width:`${width}%`}}
+                  style={{left:pct(s.startHour), width:`${((s.endHour-s.startHour)/totalHours)*100}%`}}
                   title={`${s.therapist.name} ${hLabel(s.startHour)}–${hLabel(s.endHour)}`}>
                   <span className="truncate">{s.therapist.name}</span>
                 </div>
               );
             })}
-            {room.daySlots.length===0&&<div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-gray-200"/></div>}
+            {room.daySlots.length===0&&(
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-dashed border-gray-200"/>
+              </div>
+            )}
           </div>
-          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-600 truncate text-right">{room.name}</div>
+          {/* Room name — right side */}
+          <div style={{width:ROOM_COL,flexShrink:0}} className="px-4 py-3 text-sm font-medium text-gray-700 truncate text-right">{room.name}</div>
         </div>
       ))}
-      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
+
+      {/* Legend */}
+      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400" style={{direction:'rtl'}}>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block"/> הבא</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 inline-block"/> עבר</span>
@@ -206,6 +230,7 @@ function TimelineView({rooms,slots}){
     </div>
   );
 }
+
 
 function WhoIsIn({slots}){
   const {dateStr,hour,minute}=getNow();
