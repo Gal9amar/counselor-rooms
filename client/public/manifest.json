@@ -1,7 +1,7 @@
 {
-  "name": "חדרי טיפולים",
-  "short_name": "חדרי טיפולים",
-  "description": "דשבורד לניהול שיבוצים בחדרי טיפול",
+  "name": "ניהול חדרי טיפול מרכז אופק",
+  "short_name": "מרכז אופק",
+  "description": "ניהול שיבוצים בחדרי טיפול — מרכז אופק חוף אשקלון",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
