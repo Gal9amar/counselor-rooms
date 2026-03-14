@@ -170,7 +170,7 @@ function RoomCard({room,slots,onClick,index}){
       )}
       {!active&&next&&(
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>הבא היום:</span></div>
+          <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>שיבוץ קרוב: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
           <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-400 shrink-0"/><span className="font-medium">{next.therapist.name}</span></div>
           <div className="flex items-center gap-2 text-green-600 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
           {next.note && <p className="text-xs text-gray-400 italic mt-0.5">{next.note}</p>}
