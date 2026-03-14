@@ -19,7 +19,6 @@ function formatDateHe(dateStr) {
   return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
 }
 
-// ── Room modal: monthly schedule ─────────────────────────────
 function RoomModal({ room, onClose }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [year, setYear] = useState(today.getFullYear());
@@ -32,24 +31,15 @@ function RoomModal({ room, onClose }) {
     const from = `${y}-${String(m+1).padStart(2,'0')}-01`;
     const lastDay = new Date(y, m+1, 0).getDate();
     const to = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
-    try {
-      const s = await getSchedule({ roomId: room.id, from, to });
-      setSlots(s);
-    } finally { setLoading(false); }
+    try { const s = await getSchedule({ roomId: room.id, from, to }); setSlots(s); }
+    finally { setLoading(false); }
   }, [room.id]);
 
   useEffect(() => { loadSlots(year, month); }, [year, month, loadSlots]);
 
-  const prevMonth = () => {
-    if (month === 0) { setYear(y => y-1); setMonth(11); }
-    else setMonth(m => m-1);
-  };
-  const nextMonth = () => {
-    if (month === 11) { setYear(y => y+1); setMonth(0); }
-    else setMonth(m => m+1);
-  };
+  const prevMonth = () => { if (month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1); };
+  const nextMonth = () => { if (month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1); };
 
-  // Group by date
   const slotsByDate = {};
   slots.forEach((s) => {
     const key = toDateStr(new Date(s.date));
@@ -57,7 +47,6 @@ function RoomModal({ room, onClose }) {
     slotsByDate[key].push(s);
   });
 
-  // Build calendar days for month
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const startPad = firstDay.getDay();
@@ -68,78 +57,65 @@ function RoomModal({ room, onClose }) {
   const isPrevDisabled = year === today.getFullYear() && month === today.getMonth();
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
-        dir="rtl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass-strong rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col fade-in" dir="rtl" onClick={e=>e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">{room.name}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">לחץ על יום לפרטים</p>
+            <h2 className="text-lg font-bold text-white">{room.name}</h2>
+            <p className="text-xs text-white/40 mt-0.5">שיבוצים לחודש</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+          <button onClick={onClose} className="text-white/40 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors">
             <X size={20}/>
           </button>
         </div>
 
         {/* Month nav */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
           <button onClick={prevMonth} disabled={isPrevDisabled}
-            className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors">
+            className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 transition-colors text-white/70 hover:text-white">
             <ChevronRight size={18}/>
           </button>
-          <span className="font-semibold text-gray-800">{MONTHS_HE[month]} {year}</span>
-          <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <span className="font-semibold text-white">{MONTHS_HE[month]} {year}</span>
+          <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white">
             <ChevronLeft size={18}/>
           </button>
         </div>
 
-        {/* Calendar + slots */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
           {loading ? (
-            <div className="text-center text-gray-400 py-10">טוען...</div>
+            <div className="text-center text-white/40 py-10">טוען...</div>
           ) : (
             <>
-              {/* Day headers */}
               <div className="grid grid-cols-7 mb-1">
                 {DAYS_HE.map((d) => (
-                  <div key={d} className="text-center text-xs text-gray-400 font-medium py-1">{d.slice(0,1)}</div>
+                  <div key={d} className="text-center text-xs text-white/30 font-medium py-1">{d.slice(0,1)}</div>
                 ))}
               </div>
-
-              {/* Calendar grid */}
               <div className="grid grid-cols-7 gap-1 mb-5">
                 {cells.map((day, i) => {
-                  if (!day) return <div key={`pad-${i}`}/>;
+                  if (!day) return <div key={`p-${i}`}/>;
                   const d = new Date(year, month, day);
                   const dateStr = toDateStr(d);
                   const isPast = d < today;
                   const isToday = dateStr === toDateStr(today);
-                  const daySlots = slotsByDate[dateStr] || [];
-                  const hasSlot = daySlots.length > 0;
-
+                  const hasSlot = !!(slotsByDate[dateStr]?.length);
                   return (
-                    <div key={dateStr}
-                      className={`rounded-lg py-1.5 text-sm text-center flex flex-col items-center gap-0.5 ${
-                        isToday ? 'bg-blue-100 font-bold text-blue-700'
-                        : isPast ? 'text-gray-200'
-                        : hasSlot ? 'bg-blue-50 text-gray-800 font-medium'
-                        : 'text-gray-400'
-                      }`}
-                    >
+                    <div key={dateStr} className={`rounded-lg py-1.5 text-sm text-center flex flex-col items-center gap-0.5 ${
+                      isToday ? 'bg-green-500/30 font-bold text-green-300 ring-1 ring-green-400/50'
+                      : isPast ? 'text-white/15'
+                      : hasSlot ? 'bg-green-900/40 text-green-300 font-medium'
+                      : 'text-white/40'
+                    }`}>
                       {day}
-                      {hasSlot && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-blue-500' : 'bg-blue-400'}`}/>}
+                      {hasSlot && <span className={`w-1.5 h-1.5 rounded-full ${isToday?'bg-green-300':'bg-green-500'}`}/>}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Slots list */}
               {Object.keys(slotsByDate).length === 0 ? (
-                <p className="text-center text-gray-400 text-sm py-4">אין שיבוצים בחודש זה</p>
+                <p className="text-center text-white/30 text-sm py-4">אין שיבוצים בחודש זה</p>
               ) : (
                 <div className="space-y-3">
                   {Object.keys(slotsByDate).sort().map((dateStr) => {
@@ -147,29 +123,23 @@ function RoomModal({ room, onClose }) {
                     const isPast = d < today;
                     return (
                       <div key={dateStr}>
-                        <div className={`text-xs font-semibold mb-1.5 ${isPast ? 'text-gray-300' : 'text-gray-500'}`}>
+                        <div className={`text-xs font-semibold mb-1.5 ${isPast?'text-white/25':'text-green-300'}`}>
                           {formatDateHe(dateStr)}
                         </div>
                         <div className="space-y-1">
-                          {slotsByDate[dateStr]
-                            .sort((a,b) => a.startHour - b.startHour)
-                            .map((s) => (
-                              <div key={s.id}
-                                className={`flex items-center justify-between rounded-xl px-3 py-2 ${
-                                  isPast ? 'bg-gray-50 border border-gray-100' : 'bg-blue-50 border border-blue-100'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <User size={13} className={isPast ? 'text-gray-300' : 'text-blue-500'}/>
-                                  <span className={`text-sm font-medium ${isPast ? 'text-gray-400' : 'text-gray-800'}`}>
-                                    {s.therapist.name}
-                                  </span>
-                                </div>
-                                <span className={`text-xs font-medium ${isPast ? 'text-gray-300' : 'text-blue-500'}`}>
-                                  {hLabel(s.startHour)} – {hLabel(s.endHour)}
-                                </span>
+                          {slotsByDate[dateStr].sort((a,b)=>a.startHour-b.startHour).map((s) => (
+                            <div key={s.id} className={`flex items-center justify-between rounded-xl px-3 py-2 ${
+                              isPast ? 'bg-white/5 border border-white/5' : 'bg-green-900/40 border border-green-700/30'
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <User size={13} className={isPast?'text-white/20':'text-green-400'}/>
+                                <span className={`text-sm font-medium ${isPast?'text-white/30':'text-white'}`}>{s.therapist.name}</span>
                               </div>
-                            ))}
+                              <span className={`text-xs font-medium ${isPast?'text-white/20':'text-green-400'}`}>
+                                {hLabel(s.startHour)} – {hLabel(s.endHour)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
@@ -184,110 +154,110 @@ function RoomModal({ room, onClose }) {
   );
 }
 
-// ── Room Card ─────────────────────────────────────────────────
-function RoomCard({ room, slots, onClick }) {
+function RoomCard({ room, slots, onClick, index }) {
   const { dateStr, hour, minute } = getNow();
   const nowDecimal = hour + minute / 60;
-
-  const todaySlots = slots
-    .filter((s) => s.roomId === room.id && toDateStr(new Date(s.date)) === dateStr)
-    .sort((a, b) => a.startHour - b.startHour);
-
-  const active = todaySlots.find((s) => nowDecimal >= s.startHour && nowDecimal < s.endHour);
-  const next = !active ? todaySlots.find((s) => s.startHour > hour) : null;
+  const todaySlots = slots.filter((s) => s.roomId===room.id && toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour);
+  const active = todaySlots.find((s) => nowDecimal>=s.startHour && nowDecimal<s.endHour);
+  const next = !active ? todaySlots.find((s) => s.startHour>hour) : null;
   const isActive = !!active;
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-right rounded-xl p-5 border-2 transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99] ${
-        isActive ? 'bg-green-50 border-green-400 shadow-md' : 'bg-white border-gray-200 shadow-sm hover:border-blue-300'
+    <button onClick={onClick}
+      className={`w-full text-right rounded-2xl p-5 border transition-all duration-200 hover:shadow-xl hover:shadow-black/30 hover:-translate-y-0.5 active:translate-y-0 fade-in-delay-${Math.min(index,3)} ${
+        isActive ? 'room-active glass' : 'glass hover:border-white/20'
       }`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-gray-800">{room.name}</h3>
-        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-          isActive ? 'bg-green-200 text-green-800' : 'bg-gray-100 text-gray-500'
-        }`}>{isActive ? 'פעיל' : 'פנוי'}</span>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-semibold text-white">{room.name}</h3>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+          isActive
+            ? 'bg-green-400/20 text-green-300 ring-1 ring-green-400/30'
+            : 'bg-white/8 text-white/40 ring-1 ring-white/10'
+        }`}>
+          {isActive ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full pulse-green inline-block"/>פעיל
+            </span>
+          ) : 'פנוי'}
+        </span>
       </div>
+
       {active && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-gray-700">
-            <User size={15} className="text-green-600 shrink-0"/>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-white">
+            <User size={14} className="text-green-400 shrink-0"/>
             <span className="font-semibold">{active.therapist.name}</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <Clock size={13} className="shrink-0"/>
+          <div className="flex items-center gap-2 text-white/50 text-sm">
+            <Clock size={12} className="shrink-0"/>
             <span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span>
           </div>
         </div>
       )}
       {!active && next && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-gray-400 text-sm">
-            <CalendarDays size={13} className="shrink-0"/><span>הבא היום:</span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-white/40 text-xs">
+            <CalendarDays size={12} className="shrink-0"/><span>הבא היום:</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-600">
-            <User size={15} className="text-blue-400 shrink-0"/>
+          <div className="flex items-center gap-2 text-white/80">
+            <User size={14} className="text-green-500/70 shrink-0"/>
             <span className="font-medium">{next.therapist.name}</span>
           </div>
-          <div className="flex items-center gap-2 text-blue-500 text-sm font-medium">
-            <Clock size={13} className="shrink-0"/>
+          <div className="flex items-center gap-2 text-green-400/70 text-sm">
+            <Clock size={12} className="shrink-0"/>
             <span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span>
           </div>
         </div>
       )}
-      {!active && !next && (
-        <p className="text-gray-400 text-sm">אין שיבוץ היום</p>
-      )}
-      <p className="text-xs text-gray-300 mt-3">לחץ לצפייה בלוח החודשי</p>
+      {!active && !next && <p className="text-white/30 text-sm">אין שיבוץ היום</p>}
+      <p className="text-xs text-white/20 mt-3 border-t border-white/5 pt-3">לחץ לצפייה בלוח החודשי ←</p>
     </button>
   );
 }
 
-// ── Timeline ──────────────────────────────────────────────────
 function TimelineView({ rooms, slots }) {
   const { dateStr, hour, minute } = getNow();
   const nowDecimal = hour + minute / 60;
-  const totalHours = HOURS[HOURS.length-1] + 1 - HOURS[0];
+  const totalHours = HOURS[HOURS.length-1]+1-HOURS[0];
 
   const todayRooms = rooms.map((room) => ({
     ...room,
-    daySlots: slots
-      .filter((s) => s.roomId === room.id && toDateStr(new Date(s.date)) === dateStr)
-      .sort((a, b) => a.startHour - b.startHour),
+    daySlots: slots.filter((s) => s.roomId===room.id && toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour),
   }));
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div className="flex border-b border-gray-100 bg-gray-50">
-        <div className="w-24 shrink-0 px-3 py-2 text-xs text-gray-400 font-medium">חדר</div>
-        <div className="flex-1 relative h-8">
+    <div className="glass rounded-2xl overflow-hidden fade-in">
+      <div className="flex border-b border-white/10 bg-white/5">
+        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-white/40 font-medium">חדר</div>
+        <div className="flex-1 relative h-9">
           {HOURS.map((h) => (
-            <div key={h} className="absolute top-0 text-xs text-gray-400 -translate-x-1/2"
-              style={{ left: `${((h-HOURS[0])/totalHours)*100}%` }}>
-              <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>
+            <div key={h} className="absolute top-0 text-xs text-white/30 -translate-x-1/2"
+              style={{ left:`${((h-HOURS[0])/totalHours)*100}%` }}>
+              <div className="h-2 border-r border-white/10 mx-auto w-px mb-0.5"/>
               {hLabel(h)}
             </div>
           ))}
         </div>
       </div>
       {todayRooms.map((room, ri) => (
-        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'':'bg-gray-50/50'}`}>
-          <div className="w-24 shrink-0 px-3 py-3 text-sm font-medium text-gray-700 truncate">{room.name}</div>
+        <div key={room.id} className={`flex items-center border-b border-white/5 last:border-0 ${ri%2===0?'':'bg-white/3'}`}>
+          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-white/70 truncate">{room.name}</div>
           <div className="flex-1 relative h-10 my-1">
-            {nowDecimal >= HOURS[0] && nowDecimal <= HOURS[HOURS.length-1]+1 && (
-              <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10"
-                style={{ left: `${((nowDecimal-HOURS[0])/totalHours)*100}%` }}/>
+            {nowDecimal>=HOURS[0] && nowDecimal<=HOURS[HOURS.length-1]+1 && (
+              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400/70 z-10 shadow-sm shadow-green-400/50"
+                style={{ left:`${((nowDecimal-HOURS[0])/totalHours)*100}%` }}/>
             )}
             {room.daySlots.map((s) => {
               const left = ((s.startHour-HOURS[0])/totalHours)*100;
               const width = ((s.endHour-s.startHour)/totalHours)*100;
-              const isNow = nowDecimal >= s.startHour && nowDecimal < s.endHour;
+              const isNow = nowDecimal>=s.startHour && nowDecimal<s.endHour;
               return (
                 <div key={s.id}
                   className={`absolute top-1 bottom-1 rounded-lg flex items-center px-2 text-xs font-medium overflow-hidden ${
-                    isNow ? 'bg-green-400 text-white' : s.startHour > nowDecimal ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'
+                    isNow ? 'bg-gradient-to-r from-green-500 to-green-400 text-white shadow-md shadow-green-900/50'
+                    : s.startHour > nowDecimal ? 'bg-green-900/60 text-green-300 border border-green-700/40'
+                    : 'bg-white/8 text-white/30 border border-white/5'
                   }`}
                   style={{ left:`${left}%`, width:`${width}%` }}
                   title={`${s.therapist.name} ${hLabel(s.startHour)}–${hLabel(s.endHour)}`}
@@ -296,44 +266,41 @@ function TimelineView({ rooms, slots }) {
                 </div>
               );
             })}
-            {room.daySlots.length === 0 && (
+            {room.daySlots.length===0 && (
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-dashed border-gray-100"/>
+                <div className="w-full border-t border-dashed border-white/5"/>
               </div>
             )}
           </div>
         </div>
       ))}
-      <div className="flex gap-4 px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 inline-block"/> הבא</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-200 inline-block"/> עבר</span>
-        <span className="flex items-center gap-1"><span className="w-0.5 h-3 bg-red-400 inline-block"/> עכשיו</span>
+      <div className="flex gap-5 px-4 py-2.5 border-t border-white/10 bg-white/3 text-xs text-white/30">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-900/60 border border-green-700/40 inline-block"/> הבא</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white/8 border border-white/5 inline-block"/> עבר</span>
+        <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-green-400/70 inline-block"/> עכשיו</span>
       </div>
     </div>
   );
 }
 
-// ── Who is in ─────────────────────────────────────────────────
 function WhoIsIn({ slots }) {
   const { dateStr, hour, minute } = getNow();
   const nowDecimal = hour + minute / 60;
-  const activeSlots = slots.filter(
-    (s) => toDateStr(new Date(s.date)) === dateStr && nowDecimal >= s.startHour && nowDecimal < s.endHour
-  );
-  if (activeSlots.length === 0) return null;
+  const activeSlots = slots.filter((s) => toDateStr(new Date(s.date))===dateStr && nowDecimal>=s.startHour && nowDecimal<s.endHour);
+  if (activeSlots.length===0) return null;
   return (
-    <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-      <h2 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
-        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block"/>
+    <div className="glass rounded-2xl p-4 mb-6 border-green-500/20 fade-in" style={{borderColor:'rgba(74,222,128,0.2)'}}>
+      <h2 className="text-sm font-semibold text-green-300 mb-3 flex items-center gap-2">
+        <span className="w-2 h-2 bg-green-400 rounded-full pulse-green inline-block"/>
         בבניין עכשיו ({activeSlots.length})
       </h2>
       <div className="flex flex-wrap gap-2">
         {activeSlots.map((s) => (
-          <div key={s.id} className="flex items-center gap-2 bg-white border border-green-200 rounded-lg px-3 py-1.5">
-            <User size={13} className="text-green-600"/>
-            <span className="text-sm font-medium text-gray-800">{s.therapist.name}</span>
-            <span className="text-xs text-gray-400">{s.room.name}</span>
+          <div key={s.id} className="flex items-center gap-2 bg-green-900/40 border border-green-700/30 rounded-xl px-3 py-1.5">
+            <User size={13} className="text-green-400"/>
+            <span className="text-sm font-medium text-white">{s.therapist.name}</span>
+            <span className="text-xs text-white/40">{s.room.name}</span>
           </div>
         ))}
       </div>
@@ -341,7 +308,6 @@ function WhoIsIn({ slots }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [rooms, setRooms] = useState([]);
   const [slots, setSlots] = useState([]);
@@ -354,8 +320,7 @@ export default function DashboardPage() {
     try {
       const today = new Date();
       const [r, s] = await Promise.all([getRooms(), getSchedule({ date: toDateStr(today) })]);
-      setRooms(r); setSlots(s);
-      setLastUpdated(new Date());
+      setRooms(r); setSlots(s); setLastUpdated(new Date());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -369,38 +334,37 @@ export default function DashboardPage() {
   const { dateStr, hour, minute } = getNow();
   const nowDecimal = hour + minute / 60;
   const activeRoomCount = new Set(
-    slots.filter((s) => toDateStr(new Date(s.date)) === dateStr && nowDecimal >= s.startHour && nowDecimal < s.endHour)
-      .map((s) => s.roomId)
+    slots.filter((s) => toDateStr(new Date(s.date))===dateStr && nowDecimal>=s.startHour && nowDecimal<s.endHour).map((s)=>s.roomId)
   ).size;
-
   const now = new Date();
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">דשבורד</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {DAYS_HE[now.getDay()]} {now.getDate()} {MONTHS_HE[now.getMonth()]} · {activeRoomCount} מתוך {rooms.length} חדרים פעילים
+          <h1 className="text-3xl font-bold text-white tracking-tight">דשבורד</h1>
+          <p className="text-white/50 text-sm mt-1">
+            {DAYS_HE[now.getDay()]} {now.getDate()} {MONTHS_HE[now.getMonth()]} ·{' '}
+            <span className="text-green-400">{activeRoomCount}</span> מתוך {rooms.length} חדרים פעילים
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          <div className="flex glass rounded-xl p-1 gap-0.5">
             <button onClick={() => setView('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                view==='grid' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                view==='grid' ? 'bg-green-600/40 text-green-300 shadow-sm' : 'text-white/40 hover:text-white/70'
               }`}>
               <LayoutGrid size={15}/> כרטיסים
             </button>
             <button onClick={() => setView('timeline')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                view==='timeline' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                view==='timeline' ? 'bg-green-600/40 text-green-300 shadow-sm' : 'text-white/40 hover:text-white/70'
               }`}>
               <List size={15}/> ציר זמן
             </button>
           </div>
           <button onClick={fetchData}
-            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 px-2 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+            className="flex items-center gap-1.5 text-sm text-white/30 hover:text-white/60 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors">
             <RefreshCw size={14}/>
             {lastUpdated && lastUpdated.toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' })}
           </button>
@@ -408,16 +372,16 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="text-center text-gray-400 py-20">טוען...</div>
+        <div className="text-center text-white/40 py-20">טוען...</div>
       ) : (
         <>
           <WhoIsIn slots={slots}/>
-          {view === 'grid' ? (
-            rooms.length === 0
-              ? <div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
+          {view==='grid' ? (
+            rooms.length===0
+              ? <div className="text-center text-white/30 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
               : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {rooms.map((room) => (
-                    <RoomCard key={room.id} room={room} slots={slots} onClick={() => setModalRoom(room)}/>
+                  {rooms.map((room, i) => (
+                    <RoomCard key={room.id} room={room} slots={slots} index={i} onClick={() => setModalRoom(room)}/>
                   ))}
                 </div>
           ) : (
@@ -425,7 +389,6 @@ export default function DashboardPage() {
           )}
         </>
       )}
-
       {modalRoom && <RoomModal room={modalRoom} onClose={() => setModalRoom(null)}/>}
     </div>
   );
