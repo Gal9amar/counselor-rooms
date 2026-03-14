@@ -82,6 +82,13 @@ function SlotRow({slot,therapists,onSave,onDelete}){
             <button onClick={save} disabled={saving} className="text-green-500 hover:text-green-600 p-1"><Check size={18}/></button>
             <button onClick={cancel} className="text-gray-300 hover:text-gray-500 p-1"><X size={18}/></button>
           </div>
+          <input
+            className="input py-1.5 text-sm w-full"
+            placeholder="הערה (לא חובה)"
+            value={nt}
+            onChange={e=>setNt(e.target.value)}
+            maxLength={200}
+          />
           {err&&<p className="text-red-500 text-xs">{err}</p>}
         </div>
       ):(
