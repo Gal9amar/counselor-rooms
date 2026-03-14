@@ -16,20 +16,37 @@ export default function Layout() {
       {/* Desktop top nav */}
       <nav className="hidden sm:block bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="flex justify-center items-center h-14 gap-1">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} end={to === '/'}
-                className={({ isActive }) =>
-                  `nav-item flex items-center gap-2 text-sm font-medium ${isActive ? 'active' : ''}`
-                }
-              >
-                <Icon size={16} />
-                {label}
-              </NavLink>
-            ))}
+          <div className="flex items-center justify-between h-16">
+            {/* Logo right — חוף אשקלון */}
+            <img src="/logo-left.png" alt="חוף אשקלון" className="h-10 w-auto object-contain" />
+
+            {/* Nav links centered */}
+            <div className="flex items-center gap-1">
+              {navItems.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} end={to === '/'}
+                  className={({ isActive }) =>
+                    `nav-item flex items-center gap-2 text-sm font-medium ${isActive ? 'active' : ''}`
+                  }
+                >
+                  <Icon size={16} />
+                  {label}
+                </NavLink>
+              ))}
+            </div>
+
+            {/* Logo left — אופק */}
+            <img src="/logo-right.png" alt="אופק" className="h-10 w-auto object-contain" />
           </div>
         </div>
       </nav>
+
+      {/* Mobile top bar with logos */}
+      <header className="sm:hidden bg-white border-b border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 h-14">
+          <img src="/logo-left.png" alt="חוף אשקלון" className="h-9 w-auto object-contain" />
+          <img src="/logo-right.png" alt="אופק" className="h-9 w-auto object-contain" />
+        </div>
+      </header>
 
       {/* Mobile bottom nav */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-100 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
