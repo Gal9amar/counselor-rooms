@@ -13,7 +13,6 @@ model Room {
   id            Int            @id @default(autoincrement())
   name          String         @unique
   createdAt     DateTime       @default(now())
-  shifts        Shift[]
   scheduleSlots ScheduleSlot[]
 }
 
@@ -21,33 +20,18 @@ model Therapist {
   id            Int            @id @default(autoincrement())
   name          String         @unique
   createdAt     DateTime       @default(now())
-  shifts        Shift[]
   scheduleSlots ScheduleSlot[]
 }
 
-model Shift {
-  id          Int       @id @default(autoincrement())
-  therapistId Int
-  roomId      Int
-  startTime   DateTime  @default(now())
-  endTime     DateTime?
-  therapist   Therapist @relation(fields: [therapistId], references: [id])
-  room        Room      @relation(fields: [roomId], references: [id])
-
-  @@index([therapistId])
-  @@index([roomId])
-}
-
-// Each booking = a range of hours in a room on a day
 model ScheduleSlot {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   roomId      Int
-  dayOfWeek   Int       // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
-  startHour   Int       // 8..21
-  endHour     Int       // 9..21  (exclusive end, so 8→10 = 8:00-10:00)
+  dayOfWeek   Int      // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
+  startHour   Int      // 8..21
+  endHour     Int      // 9..22
   therapistId Int
-  createdAt   DateTime  @default(now())
-  room        Room      @relation(fields: [roomId], references: [id])
+  createdAt   DateTime @default(now())
+  room        Room     @relation(fields: [roomId], references: [id])
   therapist   Therapist @relation(fields: [therapistId], references: [id])
 
   @@index([roomId, dayOfWeek])
