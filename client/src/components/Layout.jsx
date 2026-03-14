@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, History, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Settings, Menu, X } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'דשבורד', icon: LayoutDashboard },
   { to: '/schedule', label: 'לוח שבועי', icon: CalendarDays },
-  { to: '/history', label: 'היסטוריה', icon: History },
   { to: '/admin', label: 'מנהל', icon: Settings },
 ];
 
