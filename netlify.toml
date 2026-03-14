@@ -37,6 +37,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/schedule"
+  to = "/.netlify/functions/schedule"
+  status = 200
+
+[[redirects]]
+  from = "/api/schedule/*"
+  to = "/.netlify/functions/schedule/:splat"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/*"
   to = "/.netlify/functions/admin/:splat"
   status = 200
@@ -45,4 +55,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
