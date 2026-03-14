@@ -159,20 +159,19 @@ function TimelineView({rooms,slots}){
   const todayRooms=rooms.map(room=>({...room,daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour)}));
   return(
     <div className="card rounded-2xl overflow-hidden fade-up">
-      <div className="flex border-b border-gray-100 bg-gray-50">
-        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium">חדר</div>
-        <div className="flex-1 relative h-9" style={{direction:'ltr'}}>
+      <div className="flex border-b border-gray-100 bg-gray-50" dir="ltr">
+        <div className="flex-1 relative h-9">
           {HOURS.map(h=>(
             <div key={h} className="absolute top-0 text-xs text-gray-400 -translate-x-1/2" style={{left:`${((h-HOURS[0])/totalHours)*100}%`}}>
               <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>{hLabel(h)}
             </div>
           ))}
         </div>
+        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium text-right">חדר</div>
       </div>
       {todayRooms.map((room,ri)=>(
-        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
-          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-600 truncate">{room.name}</div>
-          <div className="flex-1 relative h-10 my-1" style={{direction:'ltr'}}>
+        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`} dir="ltr">
+          <div className="flex-1 relative h-10 my-1">
             {nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
               <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10 shadow-sm" style={{left:`${((nowDecimal-HOURS[0])/totalHours)*100}%`}}/>
             )}
@@ -195,6 +194,7 @@ function TimelineView({rooms,slots}){
             })}
             {room.daySlots.length===0&&<div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-gray-200"/></div>}
           </div>
+          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-600 truncate text-right">{room.name}</div>
         </div>
       ))}
       <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
