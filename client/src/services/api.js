@@ -19,7 +19,7 @@ export const addTherapist = (name) => api.post('/therapists', { name }).then((r)
 export const updateTherapist = (id, name) => api.patch(`/therapists/${id}`, { name }).then((r) => r.data);
 export const deleteTherapist = (id) => api.delete(`/therapists/${id}`).then((r) => r.data);
 
-// Schedule - date is 'YYYY-MM-DD' string
+// Schedule
 export const getSchedule = ({ roomId, date, from, to } = {}) =>
   api.get('/schedule', {
     params: {
@@ -32,6 +32,9 @@ export const getSchedule = ({ roomId, date, from, to } = {}) =>
 
 export const bookSlot = (roomId, date, startHour, endHour, therapistId) =>
   api.post('/schedule', { roomId, date, startHour, endHour, therapistId }).then((r) => r.data);
+
+export const updateSlot = (id, startHour, endHour, therapistId) =>
+  api.patch(`/schedule/${id}`, { startHour, endHour, therapistId }).then((r) => r.data);
 
 export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
 
