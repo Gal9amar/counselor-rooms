@@ -3,20 +3,22 @@ import {
   verifyAdmin, setAdminPassword,
   getRooms, addRoom, updateRoom, deleteRoom,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
-  getSchedule, clearSlot,
+  getSchedule, updateSlot, clearSlot,
 } from '../services/api';
 import { Trash2, Plus, LogIn, Pencil, Check, X } from 'lucide-react';
 
 const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const ALL_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
 
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function formatDateHe(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
 }
+function hLabel(h) { return `${h}:00`; }
 
 function EditableRow({ item, onRename, onDelete, placeholder }) {
   const [editing, setEditing] = useState(false);
@@ -55,6 +57,87 @@ function EditableRow({ item, onRename, onDelete, placeholder }) {
   );
 }
 
+// Inline edit row for a slot
+function SlotRow({ slot, therapists, onSave, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [startHour, setStartHour] = useState(slot.startHour);
+  const [endHour, setEndHour] = useState(slot.endHour);
+  const [therapistId, setTherapistId] = useState(slot.therapistId);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleSave = async () => {
+    if (endHour <= startHour) { setErr('סיום אחרי התחלה'); return; }
+    setSaving(true); setErr('');
+    try {
+      await onSave(slot.id, startHour, endHour, therapistId);
+      setEditing(false);
+    } catch (e) {
+      setErr(e.response?.data?.error || 'שגיאה');
+    } finally { setSaving(false); }
+  };
+
+  const handleCancel = () => {
+    setStartHour(slot.startHour);
+    setEndHour(slot.endHour);
+    setTherapistId(slot.therapistId);
+    setErr('');
+    setEditing(false);
+  };
+
+  return (
+    <div className="px-4 py-3">
+      {editing ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Start hour */}
+            <select
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={startHour} onChange={(e) => setStartHour(parseInt(e.target.value))}
+            >
+              {ALL_HOURS.slice(0,-1).map((h) => <option key={h} value={h}>{hLabel(h)}</option>)}
+            </select>
+            <span className="text-gray-400 text-sm">–</span>
+            {/* End hour */}
+            <select
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={endHour} onChange={(e) => setEndHour(parseInt(e.target.value))}
+            >
+              {ALL_HOURS.filter((h) => h > startHour).map((h) => <option key={h} value={h}>{hLabel(h)}</option>)}
+            </select>
+            {/* Therapist */}
+            <select
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={therapistId} onChange={(e) => setTherapistId(parseInt(e.target.value))}
+            >
+              {therapists.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <button onClick={handleSave} disabled={saving}
+              className="text-green-600 hover:text-green-700 p-1"><Check size={18}/></button>
+            <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1"><X size={18}/></button>
+          </div>
+          {err && <p className="text-red-600 text-xs">{err}</p>}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-medium text-gray-800">{slot.therapist.name}</span>
+            <span className="text-sm text-gray-400 mr-3">{slot.room.name} · {hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setEditing(true)} className="text-gray-300 hover:text-blue-500 transition-colors p-1">
+              <Pencil size={14}/>
+            </button>
+            <button onClick={() => onDelete(slot.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
+              <Trash2 size={14}/>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState(!!sessionStorage.getItem('adminPass'));
   const [password, setPassword] = useState('');
@@ -75,7 +158,7 @@ export default function AdminPage() {
   const loadAll = async () => {
     const today = new Date();
     const from = toDateStr(today);
-    const to = new Date(today); to.setDate(today.getDate() + 60);
+    const to = new Date(today); to.setFullYear(today.getFullYear() + 2);
     const [r, t, s] = await Promise.all([getRooms(), getTherapists(), getSchedule({ from, to: toDateStr(to) })]);
     setRooms(r); setTherapists(t); setSlots(s);
   };
@@ -113,13 +196,18 @@ export default function AdminPage() {
     try { await deleteTherapist(id); setTherapists(therapists.filter((t) => t.id!==id)); }
     catch (e) { setError(e.response?.data?.error || 'שגיאה'); }
   };
-  const handleClearSlot = async (slotId) => {
-    if (!confirm('לפנות את השיבוץ?')) return;
-    try { await clearSlot(slotId); setSlots(slots.filter((s) => s.id!==slotId)); }
+
+  const handleUpdateSlot = async (id, startHour, endHour, therapistId) => {
+    const updated = await updateSlot(id, startHour, endHour, therapistId);
+    setSlots((prev) => prev.map((s) => s.id===id ? {...s, ...updated} : s));
+  };
+  const handleClearSlot = async (id) => {
+    if (!confirm('למחוק את השיבוץ?')) return;
+    try { await clearSlot(id); setSlots(slots.filter((s) => s.id!==id)); }
     catch (e) { setError(e.response?.data?.error || 'שגיאה'); }
   };
 
-  // Group slots by date
+  // Group by date
   const slotsByDate = {};
   slots.forEach((s) => {
     const key = toDateStr(new Date(s.date));
@@ -213,17 +301,17 @@ export default function AdminPage() {
                 <span className="font-semibold text-gray-700">{formatDateHe(dateStr)}</span>
               </div>
               <div className="divide-y">
-                {slotsByDate[dateStr].sort((a,b) => a.startHour-b.startHour).map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <span className="font-medium text-gray-800">{s.therapist.name}</span>
-                      <span className="text-sm text-gray-400 mr-3">{s.room.name} · {s.startHour}:00–{s.endHour}:00</span>
-                    </div>
-                    <button onClick={() => handleClearSlot(s.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
-                      <Trash2 size={15}/>
-                    </button>
-                  </div>
-                ))}
+                {slotsByDate[dateStr]
+                  .sort((a,b) => a.startHour - b.startHour)
+                  .map((s) => (
+                    <SlotRow
+                      key={s.id}
+                      slot={s}
+                      therapists={therapists}
+                      onSave={handleUpdateSlot}
+                      onDelete={handleClearSlot}
+                    />
+                  ))}
               </div>
             </div>
           ))}
