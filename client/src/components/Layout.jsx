@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Settings, Building2 } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'דשבורד', icon: LayoutDashboard },
@@ -18,7 +18,7 @@ export default function Layout() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-md shadow-green-200">
-                <span className="text-white font-bold text-sm">ח</span>
+                <Building2 size={20} className="text-white" />
               </div>
               <span className="font-bold text-gray-800 text-base hidden sm:block">ניהול חדרי טיפול</span>
             </div>
