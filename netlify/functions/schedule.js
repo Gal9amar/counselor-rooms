@@ -7,37 +7,42 @@ exports.handler = async (event) => {
   const { httpMethod, path, body, headers } = event;
   const parts = path.split('/').filter(Boolean);
   const lastPart = parts[parts.length - 1];
+  const isId = !isNaN(parseInt(lastPart));
 
   try {
-    // GET /api/schedule — full weekly grid
+    // GET /api/schedule?roomId=X  OR  GET /api/schedule (all)
     if (httpMethod === 'GET') {
+      const roomId = event.queryStringParameters?.roomId
+        ? parseInt(event.queryStringParameters.roomId)
+        : null;
       const slots = await prisma.scheduleSlot.findMany({
+        where: roomId ? { roomId } : {},
         include: { therapist: true, room: true },
+        orderBy: [{ dayOfWeek: 'asc' }, { hour: 'asc' }],
       });
       return ok(slots);
     }
 
-    // POST /api/schedule — therapist self-assigns
+    // POST /api/schedule — self-assign
     if (httpMethod === 'POST') {
-      const { roomId, dayOfWeek, therapistId } = JSON.parse(body || '{}');
-      if (roomId == null || dayOfWeek == null || !therapistId)
-        return err('roomId, dayOfWeek, therapistId נדרשים', 400);
+      const { roomId, dayOfWeek, hour, therapistId } = JSON.parse(body || '{}');
+      if (roomId == null || dayOfWeek == null || hour == null || !therapistId)
+        return err('roomId, dayOfWeek, hour, therapistId נדרשים', 400);
 
-      // Check slot not already taken
       const existing = await prisma.scheduleSlot.findUnique({
-        where: { roomId_dayOfWeek: { roomId, dayOfWeek } },
+        where: { roomId_dayOfWeek_hour: { roomId, dayOfWeek, hour } },
       });
       if (existing) return err('התא כבר תפוס', 409);
 
       const slot = await prisma.scheduleSlot.create({
-        data: { roomId, dayOfWeek, therapistId },
+        data: { roomId, dayOfWeek, hour, therapistId },
         include: { therapist: true, room: true },
       });
       return ok(slot, 201);
     }
 
-    // DELETE /api/schedule/:id — admin only, clear a slot
-    if (httpMethod === 'DELETE' && !isNaN(parseInt(lastPart))) {
+    // DELETE /api/schedule/:id — admin only
+    if (httpMethod === 'DELETE' && isId) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       await prisma.scheduleSlot.delete({ where: { id: parseInt(lastPart) } });
       return ok({ success: true });
