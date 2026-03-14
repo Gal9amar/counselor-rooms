@@ -142,7 +142,7 @@ export default function AdminPage() {
 
   // Build slot map for schedule tab
   const slotMap = {};
-  slots.forEach((s) => { slotMap[`${s.roomId}-${s.dayOfWeek}`] = s; });
+  slots.forEach((s) => { slotMap[`${s.roomId}-${s.dayOfWeek}-${s.hour}`] = s; });
 
   if (!authed) {
     return (
@@ -247,6 +247,7 @@ export default function AdminPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-right px-4 py-3 font-semibold text-gray-600">חדר</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-600">שעה</th>
                   {DAYS.map((d) => (
                     <th key={d.key} className="text-center px-3 py-3 font-semibold text-gray-600">{d.label}</th>
                   ))}
