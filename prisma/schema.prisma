@@ -26,7 +26,7 @@ model Therapist {
 model ScheduleSlot {
   id          Int      @id @default(autoincrement())
   roomId      Int
-  dayOfWeek   Int      // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
+  date        DateTime // specific date, time part ignored (stored as midnight UTC)
   startHour   Int      // 8..21
   endHour     Int      // 9..22
   therapistId Int
@@ -34,6 +34,7 @@ model ScheduleSlot {
   room        Room     @relation(fields: [roomId], references: [id])
   therapist   Therapist @relation(fields: [therapistId], references: [id])
 
-  @@index([roomId, dayOfWeek])
+  @@index([roomId, date])
   @@index([therapistId])
+  @@index([date])
 }
