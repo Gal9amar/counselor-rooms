@@ -56,7 +56,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="border-t border-gray-100 mt-8 py-4 text-center text-xs text-gray-400">
-        © {new Date().getFullYear()} כל הזכויות שמורות לגל עמר
+        © 2026 כל הזכויות שמורות לגל עמר
       </footer>
     </div>
   );
