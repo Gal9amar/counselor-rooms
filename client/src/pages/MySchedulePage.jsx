@@ -38,18 +38,18 @@ export default function MySchedulePage() {
     if (!selectedId) { setSlots([]); return; }
     localStorage.setItem('myScheduleTherapistId', selectedId);
     setLoading(true);
-    const today = new Date();
-    const from = toDateStr(today);
-    const to = new Date(today); to.setFullYear(today.getFullYear() + 1);
-    getSchedule({ from, to: toDateStr(to) })
+    const past = new Date('2020-01-01');
+    const future = new Date(); future.setFullYear(future.getFullYear() + 2);
+    getSchedule({ from: toDateStr(past), to: toDateStr(future) })
       .then(all => setSlots(all.filter(s => s.therapistId === parseInt(selectedId))))
       .finally(() => setLoading(false));
   }, [selectedId]);
 
   // Group by date
   const grouped = useMemo(() => {
+    const todayStr = toDateStr(new Date());
     const filtered = filter === 'upcoming'
-      ? slots.filter(s => isFuture(toDateStr(new Date(s.date))))
+      ? slots.filter(s => toDateStr(new Date(s.date)) >= todayStr)
       : slots;
     const map = {};
     filtered.forEach(s => {
@@ -63,10 +63,11 @@ export default function MySchedulePage() {
   const therapistName = therapists.find(t => t.id === parseInt(selectedId))?.name;
 
   // Stats
+  const todayDateStr = toDateStr(new Date());
   const totalHours = slots
-    .filter(s => isFuture(toDateStr(new Date(s.date))))
+    .filter(s => toDateStr(new Date(s.date)) >= todayDateStr)
     .reduce((acc, s) => acc + (s.endHour - s.startHour), 0);
-  const totalSessions = slots.filter(s => isFuture(toDateStr(new Date(s.date)))).length;
+  const totalSessions = slots.filter(s => toDateStr(new Date(s.date)) >= todayDateStr).length;
 
   return (
     <div className="max-w-2xl mx-auto fade-up">
