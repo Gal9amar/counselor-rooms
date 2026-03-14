@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
-
 const api = axios.create({ baseURL: BASE_URL });
 
 export const setAdminPassword = (password) => {
@@ -31,9 +30,10 @@ export const getHistory = (therapistId) =>
   api.get('/shifts/history', { params: therapistId ? { therapistId } : {} }).then((r) => r.data);
 
 // Schedule
-export const getSchedule = () => api.get('/schedule').then((r) => r.data);
-export const bookSlot = (roomId, dayOfWeek, therapistId) =>
-  api.post('/schedule', { roomId, dayOfWeek, therapistId }).then((r) => r.data);
+export const getSchedule = (roomId) =>
+  api.get('/schedule', { params: roomId ? { roomId } : {} }).then((r) => r.data);
+export const bookSlot = (roomId, dayOfWeek, hour, therapistId) =>
+  api.post('/schedule', { roomId, dayOfWeek, hour, therapistId }).then((r) => r.data);
 export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
 
 // Admin
