@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getRooms, getTherapists, getSchedule, bookSlot } from '../services/api';
+import { ChevronLeft } from 'lucide-react';
 
 const DAYS = [
   { key: 0, label: 'ראשון' },
@@ -10,32 +11,28 @@ const DAYS = [
   { key: 5, label: 'שישי' },
 ];
 
-const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+const ALL_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 
-function hourLabel(h) { return `${h}:00`; }
+function hLabel(h) { return `${h}:00`; }
 
+// step = 'room' | 'day' | 'hour'
 export default function SchedulePage() {
   const [rooms, setRooms] = useState([]);
   const [therapists, setTherapists] = useState([]);
-  const [slots, setSlots] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // modal
-  const [modal, setModal] = useState(null); // { dayOfWeek, hour }
+  // wizard state
+  const [step, setStep] = useState('room');
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [slots, setSlots] = useState([]); // slots for selected room
+
+  // booking modal
+  const [startHour, setStartHour] = useState(null);
+  const [endHour, setEndHour] = useState('');
   const [selectedTherapist, setSelectedTherapist] = useState('');
   const [booking, setBooking] = useState(false);
   const [bookError, setBookError] = useState('');
-
-  const load = async (roomId) => {
-    setLoading(true);
-    try {
-      const s = await getSchedule(roomId || null);
-      setSlots(s);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     Promise.all([getRooms(), getTherapists()]).then(([r, t]) => {
@@ -45,180 +42,270 @@ export default function SchedulePage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (selectedRoom) load(parseInt(selectedRoom));
-    else setSlots([]);
-  }, [selectedRoom]);
+  const loadSlots = async (roomId) => {
+    const s = await getSchedule(roomId, null);
+    setSlots(s);
+  };
 
-  // Build lookup: "day-hour" → slot
-  const slotMap = {};
-  slots.forEach((s) => { slotMap[`${s.dayOfWeek}-${s.hour}`] = s; });
+  const handleSelectRoom = async (room) => {
+    setSelectedRoom(room);
+    setStep('day');
+    await loadSlots(room.id);
+  };
 
-  const openModal = (dayOfWeek, hour) => {
-    setModal({ dayOfWeek, hour });
-    setSelectedTherapist('');
+  const handleSelectDay = (day) => {
+    setSelectedDay(day);
+    setStep('hour');
+  };
+
+  const back = () => {
+    if (step === 'hour') { setStep('day'); setStartHour(null); setEndHour(''); setBookError(''); }
+    else if (step === 'day') { setStep('room'); setSelectedRoom(null); setSlots([]); }
+  };
+
+  // Slots for selected day
+  const daySlots = slots.filter((s) => s.dayOfWeek === selectedDay?.key);
+
+  // Which hours are occupied in selected day
+  const occupiedHours = new Set();
+  daySlots.forEach((s) => {
+    for (let h = s.startHour; h < s.endHour; h++) occupiedHours.add(h);
+  });
+
+  // Which days have at least one free hour
+  const daysFreeStatus = DAYS.map((d) => {
+    const dayOccupied = new Set();
+    slots.filter((s) => s.dayOfWeek === d.key)
+      .forEach((s) => { for (let h = s.startHour; h < s.endHour; h++) dayOccupied.add(h); });
+    const hasFree = ALL_HOURS.some((h) => !dayOccupied.has(h));
+    return { ...d, hasFree, dayOccupied };
+  });
+
+  const handleSelectStartHour = (h) => {
+    setStartHour(h);
+    setEndHour('');
     setBookError('');
+    setSelectedTherapist('');
   };
 
   const handleBook = async () => {
-    if (!selectedTherapist) return;
+    const end = parseInt(endHour);
+    if (!end || end <= startHour || end > 22) {
+      setBookError('שעת סיום לא תקינה');
+      return;
+    }
+    if (!selectedTherapist) { setBookError('בחר שם'); return; }
+
+    // Check overlap with existing
+    const hasOverlap = daySlots.some(
+      (s) => startHour < s.endHour && end > s.startHour
+    );
+    if (hasOverlap) { setBookError('קיים חופף עם שיבוץ קיים'); return; }
+
     setBooking(true);
     setBookError('');
     try {
-      const slot = await bookSlot(parseInt(selectedRoom), modal.dayOfWeek, modal.hour, parseInt(selectedTherapist));
+      const slot = await bookSlot(selectedRoom.id, selectedDay.key, startHour, end, parseInt(selectedTherapist));
       setSlots((prev) => [...prev, slot]);
-      setModal(null);
+      setStartHour(null);
+      setEndHour('');
+      setSelectedTherapist('');
     } catch (e) {
-      setBookError(e.response?.data?.error || 'שגיאה בשיבוץ');
+      setBookError(e.response?.data?.error || 'שגיאה');
     } finally {
       setBooking(false);
     }
   };
 
-  const roomName = rooms.find((r) => r.id === parseInt(selectedRoom))?.name;
+  if (loading) return <div className="text-center text-gray-400 py-20">טוען...</div>;
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">לוח שבועי</h1>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-64"
-          value={selectedRoom}
-          onChange={(e) => setSelectedRoom(e.target.value)}
-        >
-          <option value="">-- בחר חדר לצפייה --</option>
-          {rooms.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
+    <div className="max-w-2xl mx-auto">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6 flex-wrap">
+        <span className={step === 'room' ? 'font-bold text-blue-600' : 'text-gray-400'}>בחר חדר</span>
+        <ChevronLeft size={14} />
+        <span className={step === 'day' ? 'font-bold text-blue-600' : step === 'hour' ? 'text-gray-600' : 'text-gray-300'}>
+          {selectedRoom ? selectedRoom.name : 'בחר יום'}
+        </span>
+        <ChevronLeft size={14} />
+        <span className={step === 'hour' ? 'font-bold text-blue-600' : 'text-gray-300'}>
+          {selectedDay ? selectedDay.label : 'בחר שעה'}
+        </span>
       </div>
 
-      {!selectedRoom ? (
-        <div className="text-center text-gray-400 py-20">בחר חדר כדי לראות את הלוח</div>
-      ) : loading ? (
-        <div className="text-center text-gray-400 py-20">טוען...</div>
-      ) : (
-        <>
-          <p className="text-sm text-gray-500 mb-4">
-            <span className="font-medium text-gray-700">{roomName}</span> — לחץ על תא פנוי כדי להירשם
-          </p>
+      {/* Back button */}
+      {step !== 'room' && (
+        <button onClick={back} className="mb-4 text-sm text-blue-600 hover:underline flex items-center gap-1">
+          <ChevronLeft size={14} /> חזור
+        </button>
+      )}
 
-          {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="border-collapse bg-white rounded-xl shadow-sm overflow-hidden text-sm w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-right px-4 py-3 font-semibold text-gray-600 w-20">שעה</th>
-                  {DAYS.map((d) => (
-                    <th key={d.key} className="text-center px-3 py-3 font-semibold text-gray-600">{d.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {HOURS.map((hour, hi) => (
-                  <tr key={hour} className={hi % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-2.5 font-medium text-gray-500 border-l border-gray-100 text-sm">
-                      {hourLabel(hour)}
-                    </td>
-                    {DAYS.map((d) => {
-                      const slot = slotMap[`${d.key}-${hour}`];
-                      return (
-                        <td key={d.key} className="px-2 py-2 text-center">
-                          {slot ? (
-                            <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1.5 rounded-lg w-full">
-                              {slot.therapist.name}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => openModal(d.key, hour)}
-                              className="w-full text-xs text-gray-300 hover:text-blue-500 hover:bg-blue-50 border border-dashed border-gray-200 hover:border-blue-300 rounded-lg py-1.5 transition-colors"
-                            >
-                              + שבץ
-                            </button>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* STEP 1: Room */}
+      {step === 'room' && (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">לוח שבועי — בחר חדר</h1>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {rooms.map((room) => (
+              <button
+                key={room.id}
+                onClick={() => handleSelectRoom(room)}
+                className="bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-5 py-4 text-right transition-colors shadow-sm"
+              >
+                <span className="font-semibold text-gray-800">{room.name}</span>
+              </button>
+            ))}
           </div>
+        </div>
+      )}
 
-          {/* Mobile: day cards */}
-          <div className="sm:hidden space-y-5">
-            {DAYS.map((d) => {
-              const daySlots = HOURS.map((h) => ({ hour: h, slot: slotMap[`${d.key}-${h}`] }));
-              const hasAny = daySlots.some((x) => x.slot);
-              return (
-                <div key={d.key}>
-                  <h2 className="text-sm font-bold text-gray-600 mb-2 border-b pb-1">{d.label}</h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    {daySlots.map(({ hour, slot }) => (
-                      <div key={hour}>
-                        {slot ? (
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                            <div className="text-xs text-blue-500 font-medium">{hourLabel(hour)}</div>
-                            <div className="text-sm font-semibold text-blue-800 truncate">{slot.therapist.name}</div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => openModal(d.key, hour)}
-                            className="w-full border border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl px-3 py-2 text-right transition-colors"
-                          >
-                            <div className="text-xs text-gray-400">{hourLabel(hour)}</div>
-                            <div className="text-xs text-gray-300 hover:text-blue-400">+ שבץ</div>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+      {/* STEP 2: Day */}
+      {step === 'day' && (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedRoom.name}</h1>
+          <p className="text-sm text-gray-500 mb-6">בחר יום לשיבוץ</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {daysFreeStatus.map((d) => (
+              <button
+                key={d.key}
+                onClick={() => d.hasFree && handleSelectDay(d)}
+                disabled={!d.hasFree}
+                className={`rounded-xl px-4 py-5 text-center transition-colors border shadow-sm ${
+                  d.hasFree
+                    ? 'bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                    : 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed'
+                }`}
+              >
+                <div className="font-semibold text-gray-800 text-base">{d.label}</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {d.hasFree ? 'יש שעות פנויות' : 'מלא'}
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Hours */}
+      {step === 'hour' && (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{selectedRoom.name} · {selectedDay.label}</h1>
+          <p className="text-sm text-gray-500 mb-6">לחץ על שעת התחלה פנויה</p>
+
+          {/* Hour grid */}
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-6">
+            {ALL_HOURS.map((h) => {
+              const occupied = occupiedHours.has(h);
+              const isSelected = startHour === h;
+              const occupant = daySlots.find((s) => h >= s.startHour && h < s.endHour);
+              return (
+                <button
+                  key={h}
+                  disabled={occupied}
+                  onClick={() => !occupied && handleSelectStartHour(h)}
+                  title={occupied ? `${occupant?.therapist?.name}` : ''}
+                  className={`rounded-xl py-3 text-sm font-medium transition-colors border ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                      : occupied
+                      ? 'bg-gray-100 text-gray-300 border-gray-100 cursor-not-allowed'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                  }`}
+                >
+                  {hLabel(h)}
+                  {occupied && (
+                    <div className="text-xs truncate px-1 text-gray-400">
+                      {occupant?.therapist?.name?.split(' ')[0]}
+                    </div>
+                  )}
+                </button>
               );
             })}
           </div>
-        </>
-      )}
 
-      {/* Modal */}
-      {modal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" dir="rtl">
-            <h2 className="text-lg font-bold text-gray-900 mb-1">שיבוץ</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              {roomName} · {DAYS.find((d) => d.key === modal.dayOfWeek)?.label} · {hourLabel(modal.hour)}
-            </p>
+          {/* Booking form — shown after selecting start hour */}
+          {startHour !== null && (
+            <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <p className="font-semibold text-gray-800">
+                שיבוץ החל מ-<span className="text-blue-600">{hLabel(startHour)}</span>
+              </p>
 
-            <label className="block text-sm font-medium text-gray-700 mb-1">בחר את שמך</label>
-            <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4"
-              value={selectedTherapist}
-              onChange={(e) => setSelectedTherapist(e.target.value)}
-            >
-              <option value="">-- בחר --</option>
-              {therapists.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">שעת סיום</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={endHour}
+                    onChange={(e) => setEndHour(e.target.value)}
+                  >
+                    <option value="">-- בחר --</option>
+                    {ALL_HOURS.filter((h) => h > startHour).map((h) => {
+                      // disable if any hour in range is occupied
+                      const blocked = ALL_HOURS
+                        .filter((x) => x >= startHour && x < h)
+                        .some((x) => occupiedHours.has(x));
+                      return (
+                        <option key={h} value={h} disabled={blocked}>
+                          {hLabel(h)}{blocked ? ' (חסום)' : ''}
+                        </option>
+                      );
+                    })}
+                    {/* 22:00 as end-of-day option */}
+                    {!occupiedHours.has(21) && (
+                      <option value={22}>22:00</option>
+                    )}
+                  </select>
+                </div>
 
-            {bookError && <p className="text-red-600 text-sm mb-3">{bookError}</p>}
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">שמך</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={selectedTherapist}
+                    onChange={(e) => setSelectedTherapist(e.target.value)}
+                  >
+                    <option value="">-- בחר --</option>
+                    {therapists.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={handleBook}
-                disabled={!selectedTherapist || booking}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
-              >
-                {booking ? 'שומר...' : 'אשר שיבוץ'}
-              </button>
-              <button
-                onClick={() => setModal(null)}
-                className="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium py-2.5 rounded-lg transition-colors"
-              >
-                ביטול
-              </button>
+              {bookError && <p className="text-red-600 text-sm">{bookError}</p>}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBook}
+                  disabled={!endHour || !selectedTherapist || booking}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
+                >
+                  {booking ? 'שומר...' : `אשר שיבוץ ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`}
+                </button>
+                <button
+                  onClick={() => { setStartHour(null); setEndHour(''); setBookError(''); }}
+                  className="border border-gray-300 text-gray-600 hover:bg-gray-50 px-4 py-2.5 rounded-lg transition-colors"
+                >
+                  ביטול
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Existing bookings for this day */}
+          {daySlots.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">שיבוצים קיימים ביום זה</h3>
+              <div className="space-y-2">
+                {daySlots.sort((a,b) => a.startHour - b.startHour).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5">
+                    <span className="font-medium text-blue-800">{s.therapist.name}</span>
+                    <span className="text-sm text-blue-500">{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
