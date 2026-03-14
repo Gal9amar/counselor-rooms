@@ -79,7 +79,7 @@ export default function MySchedulePage() {
           <User size={18} className="text-green-500" />
         </div>
         <select
-          className="input pr-10 text-base font-medium appearance-none cursor-pointer"
+          className="input pr-10 pl-10 text-base font-medium appearance-none cursor-pointer"
           value={selectedId}
           onChange={e => setSelectedId(e.target.value)}
         >
