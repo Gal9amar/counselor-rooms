@@ -67,6 +67,7 @@ export default function SchedulePage(){
   const [startHour,setStartHour]=useState(null);
   const [endHour,setEndHour]=useState('');
   const [selectedTherapist,setSelectedTherapist]=useState('');
+  const [note,setNote]=useState('');
   const [booking,setBooking]=useState(false);
   const [bookError,setBookError]=useState('');
 
@@ -105,9 +106,9 @@ export default function SchedulePage(){
     if(daySlots.some(s=>startHour<s.endHour&&end>s.startHour)){setBookError('קיים חופף');return;}
     setBooking(true);setBookError('');
     try{
-      const slot=await bookSlot(selectedRoom.id,selectedDate,startHour,end,parseInt(selectedTherapist));
+      const slot=await bookSlot(selectedRoom.id,selectedDate,startHour,end,parseInt(selectedTherapist),note.trim()||null);
       setDaySlots(p=>[...p,slot]);setAllSlots(p=>[...p,slot]);
-      setStartHour(null);setEndHour('');setSelectedTherapist('');
+      setStartHour(null);setEndHour('');setSelectedTherapist('');setNote('');
     }catch(e){setBookError(e.response?.data?.error||'שגיאה');}
     finally{setBooking(false);}
   };
@@ -235,6 +236,10 @@ export default function SchedulePage(){
                     {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">הערה <span className="text-gray-400 font-normal text-xs">(לא חובה)</span></label>
+                <textarea className="input resize-none" rows={2} placeholder="לדוגמה: טיפול זוגי, יש להכין מצע..." value={note} onChange={e=>setNote(e.target.value)} maxLength={200}/>
               </div>
               {bookError&&<p className="text-red-500 text-sm">{bookError}</p>}
               <div className="flex gap-2">
