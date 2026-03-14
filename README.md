@@ -3,59 +3,76 @@
 דשבורד לניהול נוכחות מטפלים בחדרי טיפול.
 
 ## פיצ'רים
+
 - דשבורד חדרים בזמן אמת (ירוק = פעיל, אפור = פנוי)
 - כניסה/יציאה ממשמרת בלחיצה
 - היסטוריית משמרות עם סינון לפי מטפל
 - פאנל מנהל לניהול חדרים ומטפלים
 
 ## טכנולוגיות
+
 - **Frontend**: React + Vite + Tailwind CSS
-- **Backend**: Node.js + Express
+- **Backend**: Netlify Functions (Serverless)
 - **DB**: PostgreSQL via Supabase
-- **Deploy**: Render
+- **Deploy**: Netlify
 
 ---
 
 ## התקנה מקומית
 
 ### דרישות
+
 - Node.js 18+
 - חשבון Supabase
+- Netlify CLI: `npm i -g netlify-cli`
 
-### שרת
+### הגדרת סביבה
+
 ```bash
-cd server
 cp .env.example .env
 # ערוך .env עם פרטי Supabase
-npm install
-npx prisma migrate dev
-node prisma/seed.js   # נתוני דוגמה (אופציונלי)
-npm run dev
 ```
 
-### לקוח
+### הרצת מיגרציה
+
 ```bash
-cd client
 npm install
-npm run dev
+npx prisma migrate deploy
+# או לפיתוח: npx prisma migrate dev
 ```
+
+### הרצה מקומית עם Netlify Dev
+
+```bash
+# Root (functions + prisma)
+npm install
+
+# Client
+cd client && npm install && cd ..
+
+# הרצה
+netlify dev
+```
+
+Netlify Dev מריץ את הפונקציות ואת ה-Vite dev server יחד בפורט 8888.
 
 ---
 
-## Deploy ל-Render + Supabase
+## Deploy ל-Netlify + Supabase
 
 ### 1. Supabase
-1. צור פרויקט חדש ב-[supabase.com](https://supabase.com)
-2. עבור להגדרות → Database → Connection String
-3. העתק את **Transaction pooler** (פורט 6543) → `DATABASE_URL`
-4. העתק את **Direct connection** (פורט 5432) → `DIRECT_URL`
 
-### 2. Render
-1. חבר את המאגר ב-[render.com](https://render.com)
-2. Render יזהה את `render.yaml` אוטומטית
-3. הגדר משתני סביבה:
-   - `DATABASE_URL` - Transaction pooler מ-Supabase
-   - `DIRECT_URL` - Direct connection מ-Supabase
-   - `ADMIN_PASSWORD` - סיסמה לפאנל המנהל
-   - `CLIENT_URL` - URL של ה-frontend (לאחר deploy)
-   - `VITE_API_URL` - URL של ה-backend API
+1. צור פרויקט חדש ב-[supabase.com](https://supabase.com)
+2. הגדרות → Database → Connection String:
+   - **Transaction pooler** (פורט 6543) → `DATABASE_URL`
+   - **Direct connection** (פורט 5432) → `DIRECT_URL`
+3. הרץ מיגרציה: `npx prisma migrate deploy`
+
+### 2. Netlify
+
+1. חבר את המאגר ב-[app.netlify.com](https://app.netlify.com)
+2. Netlify יזהה את `netlify.toml` אוטומטית
+3. הגדר משתני סביבה ב-Site Settings → Environment Variables:
+   - `DATABASE_URL`
+   - `DIRECT_URL`
+   - `ADMIN_PASSWORD`
