@@ -10,18 +10,18 @@ datasource db {
 }
 
 model Room {
-  id           Int           @id @default(autoincrement())
-  name         String        @unique
-  createdAt    DateTime      @default(now())
-  shifts       Shift[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  createdAt     DateTime       @default(now())
+  shifts        Shift[]
   scheduleSlots ScheduleSlot[]
 }
 
 model Therapist {
-  id           Int           @id @default(autoincrement())
-  name         String        @unique
-  createdAt    DateTime      @default(now())
-  shifts       Shift[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  createdAt     DateTime       @default(now())
+  shifts        Shift[]
   scheduleSlots ScheduleSlot[]
 }
 
@@ -38,16 +38,16 @@ model Shift {
   @@index([roomId])
 }
 
-// Weekly schedule: room × day → therapist
 model ScheduleSlot {
   id          Int       @id @default(autoincrement())
   roomId      Int
-  dayOfWeek   Int       // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+  dayOfWeek   Int       // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
+  hour        Int       // 8..17
   therapistId Int
   createdAt   DateTime  @default(now())
   room        Room      @relation(fields: [roomId], references: [id])
   therapist   Therapist @relation(fields: [therapistId], references: [id])
 
-  @@unique([roomId, dayOfWeek])
+  @@unique([roomId, dayOfWeek, hour])
   @@index([therapistId])
 }
