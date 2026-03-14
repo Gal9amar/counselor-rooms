@@ -53,16 +53,17 @@ function SlotRow({slot,therapists,onSave,onDelete}){
   const [sh,setSh]=useState(slot.startHour);
   const [eh,setEh]=useState(slot.endHour);
   const [tid,setTid]=useState(slot.therapistId);
+  const [nt,setNt]=useState(slot.note||'');
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState('');
   const save=async()=>{
     if(eh<=sh){setErr('סיום אחרי התחלה');return;}
     setSaving(true);setErr('');
-    try{await onSave(slot.id,sh,eh,tid);setEditing(false);}
+    try{await onSave(slot.id,sh,eh,tid,nt.trim()||null);setEditing(false);}
     catch(e){setErr(e.response?.data?.error||'שגיאה');}
     finally{setSaving(false);}
   };
-  const cancel=()=>{setSh(slot.startHour);setEh(slot.endHour);setTid(slot.therapistId);setErr('');setEditing(false);};
+  const cancel=()=>{setSh(slot.startHour);setEh(slot.endHour);setTid(slot.therapistId);setNt(slot.note||'');setErr('');setEditing(false);};
   return(
     <div className="px-4 py-3 border-b border-gray-100 last:border-0">
       {editing?(
@@ -88,6 +89,7 @@ function SlotRow({slot,therapists,onSave,onDelete}){
           <div>
             <span className="font-medium text-gray-700">{slot.therapist.name}</span>
             <span className="text-sm text-gray-400 mr-3">{slot.room.name} · {hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
+            {slot.note && <span className="text-xs text-gray-400 mr-2 italic">· {slot.note}</span>}
           </div>
           <div className="flex gap-1">
             <button onClick={()=>setEditing(true)} className="text-gray-300 hover:text-green-500 p-1 transition-colors"><Pencil size={14}/></button>
@@ -128,7 +130,7 @@ export default function AdminPage(){
   const addT=async()=>{if(!newTherapist.trim())return;try{await addTherapist(newTherapist.trim());setNewTherapist('');setError('');setTherapists(await getTherapists());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
   const renT=async(id,n)=>{try{await updateTherapist(id,n);setTherapists(p=>p.map(t=>t.id===id?{...t,name:n}:t));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
   const delT=async(id)=>{if(!confirm('למחוק?'))return;try{await deleteTherapist(id);setTherapists(therapists.filter(t=>t.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
-  const saveSlot=async(id,sh,eh,tid)=>{const u=await updateSlot(id,sh,eh,tid);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
+  const saveSlot=async(id,sh,eh,tid,nt)=>{const u=await updateSlot(id,sh,eh,tid,nt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
   const delSlot=async(id)=>{if(!confirm('למחוק?'))return;try{await clearSlot(id);setSlots(slots.filter(s=>s.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
 
   const slotsByDate={};
