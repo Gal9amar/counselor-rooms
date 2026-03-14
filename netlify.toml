@@ -1,0 +1,48 @@
+[build]
+  base = "client"
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@prisma/client", "prisma"]
+  included_files = ["../prisma/**", "../node_modules/.prisma/**"]
+
+[[redirects]]
+  from = "/api/rooms"
+  to = "/.netlify/functions/rooms"
+  status = 200
+
+[[redirects]]
+  from = "/api/rooms/*"
+  to = "/.netlify/functions/rooms/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/therapists"
+  to = "/.netlify/functions/therapists"
+  status = 200
+
+[[redirects]]
+  from = "/api/therapists/*"
+  to = "/.netlify/functions/therapists/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/shifts/*"
+  to = "/.netlify/functions/shifts/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/*"
+  to = "/.netlify/functions/admin/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
