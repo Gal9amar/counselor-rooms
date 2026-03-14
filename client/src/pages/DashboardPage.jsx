@@ -300,7 +300,8 @@ export default function DashboardPage(){
       const today=new Date();
       const future=new Date(today);future.setDate(today.getDate()+30);
       const [r,s]=await Promise.all([getRooms(),getSchedule({from:toDateStr(today),to:toDateStr(future)})]);
-      setRooms(r);setSlots(s);setLastUpdated(new Date());
+      const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
+      setRooms(sortedR);setSlots(s);setLastUpdated(new Date());
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
@@ -344,8 +345,8 @@ export default function DashboardPage(){
           {view==='grid'?(
             rooms.length===0
               ?<div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
-              :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" dir="ltr">
-                {rooms.map((room,i)=><div key={room.id} dir="rtl"><RoomCard room={room} slots={slots} index={i} onClick={()=>setModalRoom(room)}/></div>)}
+              :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
           ):<TimelineView rooms={rooms} slots={slots}/>}
         </>
