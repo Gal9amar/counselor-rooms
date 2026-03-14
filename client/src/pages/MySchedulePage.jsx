@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getTherapists, getSchedule } from '../services/api';
-import { User, CalendarDays, Clock, ChevronDown } from 'lucide-react';
+import { CalendarDays, Clock, ChevronDown, User } from 'lucide-react';
 
 const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -75,11 +75,8 @@ export default function MySchedulePage() {
 
       {/* Therapist selector */}
       <div className="relative mb-6">
-        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-          <User size={18} className="text-green-500" />
-        </div>
         <select
-          className="input pr-10 pl-10 text-base font-medium appearance-none cursor-pointer"
+          className="input pl-8 text-base font-medium appearance-none cursor-pointer"
           value={selectedId}
           onChange={e => setSelectedId(e.target.value)}
         >
