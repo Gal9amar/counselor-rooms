@@ -3,7 +3,7 @@ import {
   verifyAdmin, setAdminPassword,
   getRooms, addRoom, updateRoom, deleteRoom,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
-  getHistory, getSchedule, clearSlot,
+  getSchedule, clearSlot,
 } from '../services/api';
 import { Trash2, Plus, LogIn, Pencil, Check, X } from 'lucide-react';
 
@@ -11,23 +11,6 @@ const DAYS = [
   { key: 0, label: 'ראשון' }, { key: 1, label: 'שני' }, { key: 2, label: 'שלישי' },
   { key: 3, label: 'רביעי' }, { key: 4, label: 'חמישי' }, { key: 5, label: 'שישי' },
 ];
-
-function formatDate(d) { return new Date(d).toLocaleDateString('he-IL'); }
-function formatTime(d) { return new Date(d).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); }
-
-function HistoryCard({ s }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="font-semibold text-gray-800">{s.therapist.name}</span>
-        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">{s.room.name}</span>
-      </div>
-      <div className="text-sm text-gray-500">
-        {formatDate(s.startTime)} · {formatTime(s.startTime)} – {formatTime(s.endTime)}
-      </div>
-    </div>
-  );
-}
 
 function EditableRow({ item, onRename, onDelete, placeholder }) {
   const [editing, setEditing] = useState(false);
@@ -43,8 +26,6 @@ function EditableRow({ item, onRename, onDelete, placeholder }) {
     finally { setLoading(false); }
   };
 
-  const handleCancel = () => { setVal(item.name); setEditing(false); };
-
   return (
     <div className="flex items-center gap-2 px-4 py-3">
       {editing ? (
@@ -52,10 +33,10 @@ function EditableRow({ item, onRename, onDelete, placeholder }) {
           <input autoFocus
             className="flex-1 border border-blue-400 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setVal(item.name); setEditing(false); } }}
           />
           <button onClick={handleSave} disabled={loading} className="text-green-600 hover:text-green-700 p-1"><Check size={17} /></button>
-          <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1"><X size={17} /></button>
+          <button onClick={() => { setVal(item.name); setEditing(false); }} className="text-gray-400 hover:text-gray-600 p-1"><X size={17} /></button>
         </>
       ) : (
         <>
@@ -76,7 +57,6 @@ export default function AdminPage() {
 
   const [rooms, setRooms] = useState([]);
   const [therapists, setTherapists] = useState([]);
-  const [history, setHistory] = useState([]);
   const [slots, setSlots] = useState([]);
   const [newRoom, setNewRoom] = useState('');
   const [newTherapist, setNewTherapist] = useState('');
@@ -91,8 +71,8 @@ export default function AdminPage() {
   }, [authed]);
 
   const loadAll = async () => {
-    const [r, t, h, s] = await Promise.all([getRooms(), getTherapists(), getHistory(), getSchedule()]);
-    setRooms(r); setTherapists(t); setHistory(h); setSlots(s);
+    const [r, t, s] = await Promise.all([getRooms(), getTherapists(), getSchedule()]);
+    setRooms(r); setTherapists(t); setSlots(s);
   };
 
   const handleLogin = async () => {
@@ -135,14 +115,13 @@ export default function AdminPage() {
   };
 
   const handleClearSlot = async (slotId) => {
-    if (!confirm('לפנות את התא?')) return;
+    if (!confirm('לפנות את השיבוץ?')) return;
     try { await clearSlot(slotId); setSlots(slots.filter((s) => s.id !== slotId)); }
     catch (e) { setError(e.response?.data?.error || 'שגיאה'); }
   };
 
-  // Build slot map for schedule tab
   const slotMap = {};
-  slots.forEach((s) => { slotMap[`${s.roomId}-${s.dayOfWeek}-${s.hour}`] = s; });
+  slots.forEach((s) => { slotMap[`${s.roomId}-${s.dayOfWeek}-${s.startHour}`] = s; });
 
   if (!authed) {
     return (
@@ -156,8 +135,7 @@ export default function AdminPage() {
           />
           {authError && <p className="text-red-600 text-sm mb-3">{authError}</p>}
           <button onClick={handleLogin}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
-          >
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
             <LogIn size={18} /> כניסה
           </button>
         </div>
@@ -169,7 +147,6 @@ export default function AdminPage() {
     { id: 'rooms', label: 'חדרים' },
     { id: 'therapists', label: 'מטפלים' },
     { id: 'schedule', label: 'לוח שבועי' },
-    { id: 'history', label: 'היסטוריה' },
   ];
 
   return (
@@ -182,19 +159,17 @@ export default function AdminPage() {
         </button>
       </div>
 
-      <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => { setTab(t.id); setError(''); }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >{t.label}</button>
+            }`}>{t.label}</button>
         ))}
       </div>
 
       {error && <div className="bg-red-100 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
-      {/* Rooms */}
       {tab === 'rooms' && (
         <div className="space-y-4">
           <div className="flex gap-2">
@@ -216,7 +191,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Therapists */}
       {tab === 'therapists' && (
         <div className="space-y-4">
           <div className="flex gap-2">
@@ -238,85 +212,40 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Schedule — admin can clear slots */}
       {tab === 'schedule' && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">לחץ על 🗑 לפינוי תא מהלוח</p>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-white rounded-xl shadow-sm overflow-hidden text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-right px-4 py-3 font-semibold text-gray-600">חדר</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-600">שעה</th>
-                  {DAYS.map((d) => (
-                    <th key={d.key} className="text-center px-3 py-3 font-semibold text-gray-600">{d.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rooms.map((room, ri) => (
-                  <tr key={room.id} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 font-medium text-gray-800 border-l border-gray-100">{room.name}</td>
-                    {DAYS.map((d) => {
-                      const slot = slotMap[`${room.id}-${d.key}`];
-                      return (
-                        <td key={d.key} className="px-2 py-2 text-center">
-                          {slot ? (
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-lg">
-                                {slot.therapist.name}
-                              </span>
-                              <button onClick={() => handleClearSlot(slot.id)}
-                                className="text-gray-300 hover:text-red-500 transition-colors">
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-gray-200 text-xs">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <p className="text-sm text-gray-500 mb-4">לחץ על 🗑 לפינוי שיבוץ</p>
+          <div className="space-y-4">
+            {rooms.map((room) => {
+              const roomSlots = slots.filter((s) => s.roomId === room.id);
+              if (roomSlots.length === 0) return null;
+              return (
+                <div key={room.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-700">{room.name}</span>
+                  </div>
+                  <div className="divide-y">
+                    {roomSlots.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startHour - b.startHour).map((s) => (
+                      <div key={s.id} className="flex items-center justify-between px-4 py-3">
+                        <div>
+                          <span className="font-medium text-gray-800">{s.therapist.name}</span>
+                          <span className="text-sm text-gray-400 mr-3">
+                            {DAYS.find((d) => d.key === s.dayOfWeek)?.label} · {s.startHour}:00–{s.endHour}:00
+                          </span>
+                        </div>
+                        <button onClick={() => handleClearSlot(s.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {slots.length === 0 && <p className="text-gray-400 text-sm text-center py-10">אין שיבוצים</p>}
           </div>
         </div>
-      )}
-
-      {/* History */}
-      {tab === 'history' && (
-        <>
-          <div className="sm:hidden space-y-3">
-            {history.length === 0 && <p className="text-gray-400 text-sm text-center py-10">אין היסטוריה</p>}
-            {history.map((s) => <HistoryCard key={s.id} s={s} />)}
-          </div>
-          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">מטפל</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">חדר</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">תאריך</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">כניסה</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">יציאה</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((s, i) => (
-                  <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 text-gray-800">{s.therapist.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.room.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(s.startTime)}</td>
-                    <td className="px-4 py-3 text-gray-600">{formatTime(s.startTime)}</td>
-                    <td className="px-4 py-3 text-gray-600">{formatTime(s.endTime)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
       )}
     </div>
   );
