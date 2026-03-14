@@ -36,14 +36,14 @@ exports.handler = async (event) => {
     // DELETE /api/therapists/:id (admin)
     if (httpMethod === 'DELETE' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      const slotCount = await prisma.scheduleSlot.count({
-        where: { therapistId: parseInt(id) }
-      });
+      const tid = parseInt(id);
+      const slotCount = await prisma.scheduleSlot.count({ where: { therapistId: tid } });
+      // Delete slots first, then therapist
       if (slotCount > 0) {
-        return err(`לא ניתן למחוק — למטפל יש ${slotCount} שיבוצים. יש למחוק את השיבוצים תחילה.`, 409);
+        await prisma.scheduleSlot.deleteMany({ where: { therapistId: tid } });
       }
-      await prisma.therapist.delete({ where: { id: parseInt(id) } });
-      return ok({ success: true });
+      await prisma.therapist.delete({ where: { id: tid } });
+      return ok({ success: true, deletedSlots: slotCount });
     }
 
     return err('Method not allowed', 405);
