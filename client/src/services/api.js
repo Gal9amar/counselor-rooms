@@ -19,16 +19,20 @@ export const addTherapist = (name) => api.post('/therapists', { name }).then((r)
 export const updateTherapist = (id, name) => api.patch(`/therapists/${id}`, { name }).then((r) => r.data);
 export const deleteTherapist = (id) => api.delete(`/therapists/${id}`).then((r) => r.data);
 
-// Schedule
-export const getSchedule = (roomId, dayOfWeek) =>
+// Schedule - date is 'YYYY-MM-DD' string
+export const getSchedule = ({ roomId, date, from, to } = {}) =>
   api.get('/schedule', {
     params: {
       ...(roomId != null ? { roomId } : {}),
-      ...(dayOfWeek != null ? { dayOfWeek } : {}),
+      ...(date ? { date } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
     },
   }).then((r) => r.data);
-export const bookSlot = (roomId, dayOfWeek, startHour, endHour, therapistId) =>
-  api.post('/schedule', { roomId, dayOfWeek, startHour, endHour, therapistId }).then((r) => r.data);
+
+export const bookSlot = (roomId, date, startHour, endHour, therapistId) =>
+  api.post('/schedule', { roomId, date, startHour, endHour, therapistId }).then((r) => r.data);
+
 export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
 
 // Admin
