@@ -1,0 +1,13 @@
+{
+  "name": "counselor-rooms",
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.19.0"
+  }
+}
