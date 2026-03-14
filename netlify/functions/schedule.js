@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 
     // POST
     if (httpMethod === 'POST') {
-      const { roomId, date, startHour, endHour, therapistId } = JSON.parse(body || '{}');
+      const { roomId, date, startHour, endHour, therapistId, note } = JSON.parse(body || '{}');
       if (!roomId || !date || startHour == null || endHour == null || !therapistId)
         return err('roomId, date, startHour, endHour, therapistId נדרשים', 400);
       if (endHour <= startHour)
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
         return err(`קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
 
       const slot = await prisma.scheduleSlot.create({
-        data: { roomId, date: dateUTC, startHour, endHour, therapistId },
+        data: { roomId, date: dateUTC, startHour, endHour, therapistId, ...(note ? { note } : {}) },
         include: { therapist: true, room: true },
       });
       return ok(slot, 201);
@@ -61,7 +61,7 @@ exports.handler = async (event) => {
     // PATCH /api/schedule/:id — admin only
     if (httpMethod === 'PATCH' && isId) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      const { startHour, endHour, therapistId } = JSON.parse(body || '{}');
+      const { startHour, endHour, therapistId, note } = JSON.parse(body || '{}');
 
       if (startHour == null || endHour == null || !therapistId)
         return err('startHour, endHour, therapistId נדרשים', 400);
@@ -89,7 +89,7 @@ exports.handler = async (event) => {
 
       const slot = await prisma.scheduleSlot.update({
         where: { id },
-        data: { startHour, endHour, therapistId },
+        data: { startHour, endHour, therapistId, note: note ?? null },
         include: { therapist: true, room: true },
       });
       return ok(slot);
