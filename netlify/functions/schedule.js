@@ -15,13 +15,11 @@ exports.handler = async (event) => {
   const isId = !isNaN(parseInt(lastPart));
 
   try {
-    // GET /api/schedule?roomId=X&date=YYYY-MM-DD&from=YYYY-MM-DD&to=YYYY-MM-DD
+    // GET
     if (httpMethod === 'GET') {
       const qs = event.queryStringParameters || {};
       const where = {};
-
       if (qs.roomId) where.roomId = parseInt(qs.roomId);
-
       if (qs.date) {
         where.date = toMidnightUTC(qs.date);
       } else if (qs.from || qs.to) {
@@ -29,7 +27,6 @@ exports.handler = async (event) => {
         if (qs.from) where.date.gte = toMidnightUTC(qs.from);
         if (qs.to)   where.date.lte = toMidnightUTC(qs.to);
       }
-
       const slots = await prisma.scheduleSlot.findMany({
         where,
         include: { therapist: true, room: true },
@@ -38,43 +35,64 @@ exports.handler = async (event) => {
       return ok(slots);
     }
 
-    // POST /api/schedule
+    // POST
     if (httpMethod === 'POST') {
       const { roomId, date, startHour, endHour, therapistId } = JSON.parse(body || '{}');
-
       if (!roomId || !date || startHour == null || endHour == null || !therapistId)
         return err('roomId, date, startHour, endHour, therapistId נדרשים', 400);
-
       if (endHour <= startHour)
         return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
 
       const dateUTC = toMidnightUTC(date);
-
-      // Overlap check
       const overlapping = await prisma.scheduleSlot.findFirst({
-        where: {
-          roomId,
-          date: dateUTC,
-          AND: [
-            { startHour: { lt: endHour } },
-            { endHour: { gt: startHour } },
-          ],
-        },
+        where: { roomId, date: dateUTC, AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
         include: { therapist: true },
       });
-
-      if (overlapping) {
-        return err(
-          `קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`,
-          409
-        );
-      }
+      if (overlapping)
+        return err(`קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
 
       const slot = await prisma.scheduleSlot.create({
         data: { roomId, date: dateUTC, startHour, endHour, therapistId },
         include: { therapist: true, room: true },
       });
       return ok(slot, 201);
+    }
+
+    // PATCH /api/schedule/:id — admin only
+    if (httpMethod === 'PATCH' && isId) {
+      if (!checkAdmin(headers)) return err('Unauthorized', 401);
+      const { startHour, endHour, therapistId } = JSON.parse(body || '{}');
+
+      if (startHour == null || endHour == null || !therapistId)
+        return err('startHour, endHour, therapistId נדרשים', 400);
+      if (endHour <= startHour)
+        return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
+
+      const id = parseInt(lastPart);
+
+      // Get current slot to check room+date
+      const current = await prisma.scheduleSlot.findUnique({ where: { id } });
+      if (!current) return err('שיבוץ לא נמצא', 404);
+
+      // Overlap check (exclude self)
+      const overlapping = await prisma.scheduleSlot.findFirst({
+        where: {
+          id: { not: id },
+          roomId: current.roomId,
+          date: current.date,
+          AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
+        },
+        include: { therapist: true },
+      });
+      if (overlapping)
+        return err(`קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
+
+      const slot = await prisma.scheduleSlot.update({
+        where: { id },
+        data: { startHour, endHour, therapistId },
+        include: { therapist: true, room: true },
+      });
+      return ok(slot);
     }
 
     // DELETE /api/schedule/:id — admin only
