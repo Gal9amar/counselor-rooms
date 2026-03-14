@@ -173,6 +173,7 @@ function RoomCard({room,slots,onClick,index}){
           <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>הבא היום:</span></div>
           <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-400 shrink-0"/><span className="font-medium">{next.therapist.name}</span></div>
           <div className="flex items-center gap-2 text-green-600 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
+          {next.note && <p className="text-xs text-gray-400 italic mt-0.5">{next.note}</p>}
         </div>
       )}
       {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוץ היום</p>}
@@ -297,7 +298,8 @@ export default function DashboardPage(){
   const fetchData=async()=>{
     try{
       const today=new Date();
-      const [r,s]=await Promise.all([getRooms(),getSchedule({date:toDateStr(today)})]);
+      const future=new Date(today);future.setDate(today.getDate()+30);
+      const [r,s]=await Promise.all([getRooms(),getSchedule({from:toDateStr(today),to:toDateStr(future)})]);
       setRooms(r);setSlots(s);setLastUpdated(new Date());
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
