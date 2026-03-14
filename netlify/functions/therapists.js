@@ -24,6 +24,15 @@ exports.handler = async (event) => {
       return ok(therapist, 201);
     }
 
+    // PATCH /api/therapists/:id (admin)
+    if (httpMethod === 'PATCH' && isIdPath) {
+      if (!checkAdmin(headers)) return err('Unauthorized', 401);
+      const { name } = JSON.parse(body || '{}');
+      if (!name) return err('שם מטפל נדרש', 400);
+      const therapist = await prisma.therapist.update({ where: { id: parseInt(id) }, data: { name } });
+      return ok(therapist);
+    }
+
     // DELETE /api/therapists/:id (admin)
     if (httpMethod === 'DELETE' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
