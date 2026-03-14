@@ -11,24 +11,8 @@ exports.handler = async (event) => {
   try {
     // GET /api/rooms
     if (httpMethod === 'GET') {
-      const rooms = await prisma.room.findMany({
-        orderBy: { name: 'asc' },
-        include: {
-          shifts: {
-            where: { endTime: null },
-            include: { therapist: true },
-            take: 1,
-          },
-        },
-      });
-      const result = rooms.map((room) => ({
-        id: room.id,
-        name: room.name,
-        activeShift: room.shifts[0]
-          ? { id: room.shifts[0].id, therapist: room.shifts[0].therapist, startTime: room.shifts[0].startTime }
-          : null,
-      }));
-      return ok(result);
+      const rooms = await prisma.room.findMany({ orderBy: { name: 'asc' } });
+      return ok(rooms);
     }
 
     // POST /api/rooms (admin)
