@@ -156,41 +156,44 @@ function TimelineView({rooms,slots}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
   const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
-  const ROOM_COL=112; // px, matches w-28
 
   const todayRooms=rooms.map(room=>({
     ...room,
     daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour)
   }));
 
-  // pct: 0% = 8:00 (left), 100% = 21:00 (right)
-  const pct=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
+  // In RTL layout: right:0% = visual right (near room name = hour 8)
+  // right:X% positions element X% from the right edge
+  const toRight=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
+  const barWidth=(s)=>`${((s.endHour-s.startHour)/totalHours)*100}%`;
 
   return(
-    <div className="card rounded-2xl overflow-hidden fade-up" style={{direction:'ltr'}}>
-      {/* Header row */}
-      <div className="flex border-b border-gray-100 bg-gray-50" style={{direction:'ltr'}}>
-        {/* Timeline axis */}
-        <div className="flex-1 relative h-9 border-r border-gray-100">
+    <div className="card rounded-2xl overflow-hidden fade-up">
+      {/* Header */}
+      <div className="flex border-b border-gray-100 bg-gray-50">
+        {/* Room label — first in RTL = rightmost */}
+        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium">חדר</div>
+        {/* Hour axis */}
+        <div className="flex-1 relative h-9">
           {HOURS.map(h=>(
-            <div key={h} className="absolute top-0 text-xs text-gray-400" style={{left:pct(h),transform:'translateX(-50%)'}}>
-              <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>
+            <div key={h} className="absolute top-0 text-xs text-gray-400 translate-x-1/2" style={{right:toRight(h)}}>
+              <div className="h-2 border-l border-gray-200 mx-auto w-px mb-0.5"/>
               {hLabel(h)}
             </div>
           ))}
         </div>
-        {/* Room column header */}
-        <div style={{width:ROOM_COL,flexShrink:0}} className="px-4 py-2.5 text-xs text-gray-400 font-medium text-center">חדר</div>
       </div>
 
-      {/* Data rows */}
+      {/* Rows */}
       {todayRooms.map((room,ri)=>(
-        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`} style={{direction:'ltr'}}>
+        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
+          {/* Room name — first in RTL = rightmost */}
+          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-700 truncate">{room.name}</div>
           {/* Bar area */}
-          <div className="flex-1 relative h-10 my-1 border-r border-gray-100">
+          <div className="flex-1 relative h-10 my-1">
             {/* Now line */}
             {nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
-              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10" style={{left:pct(nowDecimal)}}/>
+              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10" style={{right:toRight(nowDecimal)}}/>
             )}
             {/* Slots */}
             {room.daySlots.map(s=>{
@@ -203,7 +206,7 @@ function TimelineView({rooms,slots}){
                     :isPast?'bg-gray-100 text-gray-400'
                     :'bg-green-100 text-green-700 border border-green-200'
                   }`}
-                  style={{left:pct(s.startHour), width:`${((s.endHour-s.startHour)/totalHours)*100}%`}}
+                  style={{right:toRight(s.startHour), width:barWidth(s)}}
                   title={`${s.therapist.name} ${hLabel(s.startHour)}–${hLabel(s.endHour)}`}>
                   <span className="truncate">{s.therapist.name}</span>
                 </div>
@@ -215,13 +218,11 @@ function TimelineView({rooms,slots}){
               </div>
             )}
           </div>
-          {/* Room name — right side */}
-          <div style={{width:ROOM_COL,flexShrink:0}} className="px-4 py-3 text-sm font-medium text-gray-700 truncate text-right">{room.name}</div>
         </div>
       ))}
 
       {/* Legend */}
-      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400" style={{direction:'rtl'}}>
+      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block"/> הבא</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 inline-block"/> עבר</span>
