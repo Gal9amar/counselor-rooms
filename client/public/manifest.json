@@ -1,10 +1,10 @@
 {
-  "name": "ניהול חדרי טיפול",
-  "short_name": "חדרי טיפול",
+  "name": "חדרי טיפולים",
+  "short_name": "חדרי טיפולים",
   "description": "דשבורד לניהול שיבוצים בחדרי טיפול",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8faf8",
+  "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "orientation": "any",
   "lang": "he",
