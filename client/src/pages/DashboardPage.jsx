@@ -116,12 +116,40 @@ function RoomModal({room,onClose}){
   );
 }
 
+function formatNextDate(dateStr){
+  const today=toDateStr(new Date());
+  if(dateStr===today) return 'היום';
+  const d=new Date(dateStr+'T00:00:00');
+  const diff=Math.round((d-new Date(today+'T00:00:00'))/(1000*60*60*24));
+  if(diff===1) return 'מחר';
+  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+}
+
 function RoomCard({room,slots,onClick,index}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
-  const todaySlots=slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour);
+
+  // All slots for this room sorted by date+hour
+  const roomSlots=slots
+    .filter(s=>s.roomId===room.id)
+    .sort((a,b)=>{
+      const da=toDateStr(new Date(a.date));
+      const db=toDateStr(new Date(b.date));
+      if(da!==db) return da<db?-1:1;
+      return a.startHour-b.startHour;
+    });
+
+  const todaySlots=roomSlots.filter(s=>toDateStr(new Date(s.date))===dateStr);
   const active=todaySlots.find(s=>nowDecimal>=s.startHour&&nowDecimal<s.endHour);
-  const next=!active?todaySlots.find(s=>s.startHour>hour):null;
+
+  // Next = first slot that hasn't ended yet (today or future)
+  const next=!active?roomSlots.find(s=>{
+    const sd=toDateStr(new Date(s.date));
+    if(sd>dateStr) return true;
+    if(sd===dateStr) return s.endHour>nowDecimal;
+    return false;
+  }):null;
+
   const isActive=!!active;
 
   return(
