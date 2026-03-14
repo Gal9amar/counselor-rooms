@@ -137,6 +137,7 @@ function RoomCard({room,slots,onClick,index}){
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-500 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
           <div className="flex items-center gap-2 text-gray-400 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
+          {active.note && <p className="text-xs text-gray-400 italic mt-0.5">{active.note}</p>}
         </div>
       )}
       {!active&&next&&(
