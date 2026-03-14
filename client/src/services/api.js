@@ -4,7 +4,6 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({ baseURL: BASE_URL });
 
-// Admin password injector
 export const setAdminPassword = (password) => {
   api.defaults.headers.common['x-admin-password'] = password;
 };
@@ -12,11 +11,13 @@ export const setAdminPassword = (password) => {
 // Rooms
 export const getRooms = () => api.get('/rooms').then((r) => r.data);
 export const addRoom = (name) => api.post('/rooms', { name }).then((r) => r.data);
+export const updateRoom = (id, name) => api.patch(`/rooms/${id}`, { name }).then((r) => r.data);
 export const deleteRoom = (id) => api.delete(`/rooms/${id}`).then((r) => r.data);
 
 // Therapists
 export const getTherapists = () => api.get('/therapists').then((r) => r.data);
 export const addTherapist = (name) => api.post('/therapists', { name }).then((r) => r.data);
+export const updateTherapist = (id, name) => api.patch(`/therapists/${id}`, { name }).then((r) => r.data);
 export const deleteTherapist = (id) => api.delete(`/therapists/${id}`).then((r) => r.data);
 
 // Shifts
