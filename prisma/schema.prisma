@@ -38,16 +38,18 @@ model Shift {
   @@index([roomId])
 }
 
+// Each booking = a range of hours in a room on a day
 model ScheduleSlot {
   id          Int       @id @default(autoincrement())
   roomId      Int
   dayOfWeek   Int       // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri
-  hour        Int       // 8..17
+  startHour   Int       // 8..21
+  endHour     Int       // 9..21  (exclusive end, so 8→10 = 8:00-10:00)
   therapistId Int
   createdAt   DateTime  @default(now())
   room        Room      @relation(fields: [roomId], references: [id])
   therapist   Therapist @relation(fields: [therapistId], references: [id])
 
-  @@unique([roomId, dayOfWeek, hour])
+  @@index([roomId, dayOfWeek])
   @@index([therapistId])
 }
