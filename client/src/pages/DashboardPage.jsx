@@ -161,7 +161,7 @@ function TimelineView({rooms,slots}){
     <div className="card rounded-2xl overflow-hidden fade-up">
       <div className="flex border-b border-gray-100 bg-gray-50">
         <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium">חדר</div>
-        <div className="flex-1 relative h-9">
+        <div className="flex-1 relative h-9" style={{direction:'ltr'}}>
           {HOURS.map(h=>(
             <div key={h} className="absolute top-0 text-xs text-gray-400 -translate-x-1/2" style={{left:`${((h-HOURS[0])/totalHours)*100}%`}}>
               <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>{hLabel(h)}
@@ -172,7 +172,7 @@ function TimelineView({rooms,slots}){
       {todayRooms.map((room,ri)=>(
         <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
           <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-600 truncate">{room.name}</div>
-          <div className="flex-1 relative h-10 my-1">
+          <div className="flex-1 relative h-10 my-1" style={{direction:'ltr'}}>
             {nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
               <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10 shadow-sm" style={{left:`${((nowDecimal-HOURS[0])/totalHours)*100}%`}}/>
             )}
