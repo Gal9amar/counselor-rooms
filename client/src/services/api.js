@@ -30,10 +30,17 @@ export const getHistory = (therapistId) =>
   api.get('/shifts/history', { params: therapistId ? { therapistId } : {} }).then((r) => r.data);
 
 // Schedule
-export const getSchedule = (roomId) =>
-  api.get('/schedule', { params: roomId ? { roomId } : {} }).then((r) => r.data);
-export const bookSlot = (roomId, dayOfWeek, hour, therapistId) =>
-  api.post('/schedule', { roomId, dayOfWeek, hour, therapistId }).then((r) => r.data);
+export const getSchedule = (roomId, dayOfWeek) =>
+  api.get('/schedule', {
+    params: {
+      ...(roomId != null ? { roomId } : {}),
+      ...(dayOfWeek != null ? { dayOfWeek } : {}),
+    },
+  }).then((r) => r.data);
+
+export const bookSlot = (roomId, dayOfWeek, startHour, endHour, therapistId) =>
+  api.post('/schedule', { roomId, dayOfWeek, startHour, endHour, therapistId }).then((r) => r.data);
+
 export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
 
 // Admin
