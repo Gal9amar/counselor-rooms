@@ -61,7 +61,7 @@ exports.handler = async (event) => {
     // PATCH /api/schedule/:id — admin only
     if (httpMethod === 'PATCH' && isId) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      const { startHour, endHour, therapistId, note } = JSON.parse(body || '{}');
+      const { startHour, endHour, therapistId, note, roomId, date } = JSON.parse(body || '{}');
 
       if (startHour == null || endHour == null || !therapistId)
         return err('startHour, endHour, therapistId נדרשים', 400);
@@ -70,16 +70,18 @@ exports.handler = async (event) => {
 
       const id = parseInt(lastPart);
 
-      // Get current slot to check room+date
       const current = await prisma.scheduleSlot.findUnique({ where: { id } });
       if (!current) return err('שיבוץ לא נמצא', 404);
+
+      const targetRoomId = roomId ?? current.roomId;
+      const targetDate = date ? toMidnightUTC(date) : current.date;
 
       // Overlap check (exclude self)
       const overlapping = await prisma.scheduleSlot.findFirst({
         where: {
           id: { not: id },
-          roomId: current.roomId,
-          date: current.date,
+          roomId: targetRoomId,
+          date: targetDate,
           AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
         },
         include: { therapist: true },
@@ -89,8 +91,8 @@ exports.handler = async (event) => {
 
       const slot = await prisma.scheduleSlot.update({
         where: { id },
-        data: { startHour, endHour, therapistId, note: note ?? null },
-        include: { therapist: true, room: true },
+        data: { startHour, endHour, therapistId, note: note ?? null, roomId: targetRoomId, date: targetDate },
+        include: { therapist: true, room: true, recurring: true },
       });
       return ok(slot);
     }

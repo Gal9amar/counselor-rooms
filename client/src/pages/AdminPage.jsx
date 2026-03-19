@@ -50,27 +50,33 @@ function EditableRow({item,onRename,onDelete,placeholder}){
   );
 }
 
-function SlotRow({slot,therapists,onSave,onDelete}){
+function SlotRow({slot,therapists,rooms,onSave,onDelete}){
   const [editing,setEditing]=useState(false);
   const [sh,setSh]=useState(slot.startHour);
   const [eh,setEh]=useState(slot.endHour);
   const [tid,setTid]=useState(slot.therapistId);
+  const [rid,setRid]=useState(slot.roomId);
+  const [dt,setDt]=useState(toDateStr(new Date(slot.date)));
   const [nt,setNt]=useState(slot.note||'');
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState('');
   const save=async()=>{
     if(eh<=sh){setErr('סיום אחרי התחלה');return;}
     setSaving(true);setErr('');
-    try{await onSave(slot.id,sh,eh,tid,nt.trim()||null);setEditing(false);}
+    try{await onSave(slot.id,sh,eh,tid,nt.trim()||null,rid,dt);setEditing(false);}
     catch(e){setErr(e.response?.data?.error||'שגיאה');}
     finally{setSaving(false);}
   };
-  const cancel=()=>{setSh(slot.startHour);setEh(slot.endHour);setTid(slot.therapistId);setNt(slot.note||'');setErr('');setEditing(false);};
+  const cancel=()=>{setSh(slot.startHour);setEh(slot.endHour);setTid(slot.therapistId);setRid(slot.roomId);setDt(toDateStr(new Date(slot.date)));setNt(slot.note||'');setErr('');setEditing(false);};
   return(
     <div className="px-4 py-3 border-b border-gray-100 last:border-0">
       {editing?(
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
+            <select className="input py-1.5 text-sm w-auto" value={rid} onChange={e=>setRid(parseInt(e.target.value))}>
+              {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            <input type="date" className="input py-1.5 text-sm w-auto" value={dt} onChange={e=>setDt(e.target.value)}/>
             <select className="input py-1.5 text-sm w-auto" value={sh} onChange={e=>setSh(parseInt(e.target.value))}>
               {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
             </select>
@@ -84,25 +90,20 @@ function SlotRow({slot,therapists,onSave,onDelete}){
             <button onClick={save} disabled={saving} className="text-green-500 hover:text-green-600 p-1"><Check size={18}/></button>
             <button onClick={cancel} className="text-gray-300 hover:text-gray-500 p-1"><X size={18}/></button>
           </div>
-          <input
-            className="input py-1.5 text-sm w-full"
-            placeholder="הערה (לא חובה)"
-            value={nt}
-            onChange={e=>setNt(e.target.value)}
-            maxLength={200}
-          />
+          <input className="input py-1.5 text-sm w-full" placeholder="הערה (לא חובה)" value={nt}
+            onChange={e=>setNt(e.target.value)} maxLength={200}/>
           {err&&<p className="text-red-500 text-xs">{err}</p>}
         </div>
       ):(
         <div className="flex items-center justify-between">
           <div>
             <span className="font-medium text-gray-700">{slot.therapist.name}</span>
-            <span className="text-sm text-gray-400 mr-3">{slot.room.name} · {hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
-            {slot.note && <span className="text-xs text-gray-400 mr-2 italic">· {slot.note}</span>}
+            <span className="text-sm text-gray-400 mr-3">{slot.room.name} · {formatDateHe(toDateStr(new Date(slot.date)))} · {hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
+            {slot.note&&<span className="text-xs text-gray-400 mr-2 italic">· {slot.note}</span>}
           </div>
           <div className="flex gap-1">
             <button onClick={()=>setEditing(true)} className="text-gray-300 hover:text-green-500 p-1 transition-colors"><Pencil size={14}/></button>
-            <button onClick={()=>onDelete(slot.id)} className="text-gray-300 hover:text-red-400 p-1 transition-colors"><Trash2 size={14}/></button>
+            <button onClick={()=>onDelete(slot)} className="text-gray-300 hover:text-red-400 p-1 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
       )}
@@ -158,7 +159,7 @@ export default function AdminPage(){
     try{await deleteTherapist(id);setTherapists(therapists.filter(t=>t.id!==id));setSlots(slots.filter(s=>s.therapistId!==id));}
     catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
-  const saveSlot=async(id,sh,eh,tid,nt)=>{const u=await updateSlot(id,sh,eh,tid,nt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
+  const saveSlot=async(id,sh,eh,tid,nt,rid,dt)=>{const u=await updateSlot(id,sh,eh,tid,nt,rid,dt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
 
   const [deleteModal,setDeleteModal]=useState(null); // {slot}
 
@@ -328,7 +329,7 @@ export default function AdminPage(){
                       <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
                     </div>
                     {slotsByDate[ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
-                      <SlotRow key={s.id} slot={s} therapists={therapists} onSave={saveSlot} onDelete={()=>delSlot(s)}/>
+                      <SlotRow key={s.id} slot={s} therapists={therapists} rooms={rooms} onSave={saveSlot} onDelete={()=>delSlot(s)}/>
                     ))}
                   </div>
                 ))}

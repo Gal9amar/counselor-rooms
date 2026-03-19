@@ -33,8 +33,8 @@ export const getSchedule = ({ roomId, date, from, to } = {}) =>
 export const bookSlot = (roomId, date, startHour, endHour, therapistId, note) =>
   api.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}) }).then((r) => r.data);
 
-export const updateSlot = (id, startHour, endHour, therapistId, note) =>
-  api.patch(`/schedule/${id}`, { startHour, endHour, therapistId, note: note ?? null }).then((r) => r.data);
+export const updateSlot = (id, startHour, endHour, therapistId, note, roomId, date) =>
+  api.patch(`/schedule/${id}`, { startHour, endHour, therapistId, note: note ?? null, roomId, date }).then((r) => r.data);
 
 export const clearSlot = (id, scope = 'single') =>
   api.delete(`/schedule/${id}`, { params: { scope } }).then((r) => r.data);
