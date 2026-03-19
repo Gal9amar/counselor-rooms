@@ -184,7 +184,7 @@ function RoomCard({room,slots,onClick,index}){
           </div>
         )}
         {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
-        <p className="text-xs text-gray-300 mt-auto pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי</p>
+        <p className="text-xs text-gray-400 mt-auto pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי ←</p>
       </div>
     </button>
   );
