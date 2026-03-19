@@ -154,7 +154,7 @@ function RoomCard({room,slots,onClick,index}){
 
   return(
     <button onClick={onClick}
-      className={`w-full text-right rounded-2xl p-5 border-2 transition-all duration-250 fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
+      className={`w-full text-right rounded-2xl p-5 fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
         <span className={isActive?'badge-active':'badge-free'}>
