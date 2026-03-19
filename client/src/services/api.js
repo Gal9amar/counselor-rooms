@@ -36,7 +36,11 @@ export const bookSlot = (roomId, date, startHour, endHour, therapistId, note) =>
 export const updateSlot = (id, startHour, endHour, therapistId, note) =>
   api.patch(`/schedule/${id}`, { startHour, endHour, therapistId, note: note ?? null }).then((r) => r.data);
 
-export const clearSlot = (id) => api.delete(`/schedule/${id}`).then((r) => r.data);
+export const clearSlot = (id, scope = 'single') =>
+  api.delete(`/schedule/${id}`, { params: { scope } }).then((r) => r.data);
+
+// Recurring
+export const bookRecurring = (data) => api.post('/recurring', data).then((r) => r.data);
 
 // Admin
 export const verifyAdmin = (password) =>

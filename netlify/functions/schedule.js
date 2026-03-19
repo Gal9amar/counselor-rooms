@@ -96,9 +96,26 @@ exports.handler = async (event) => {
     }
 
     // DELETE /api/schedule/:id — admin only
+    // ?scope=single (default) | all (delete entire recurring series)
     if (httpMethod === 'DELETE' && isId) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      await prisma.scheduleSlot.delete({ where: { id: parseInt(lastPart) } });
+      const id = parseInt(lastPart);
+      const scope = (event.queryStringParameters || {}).scope || 'single';
+
+      if (scope === 'all') {
+        const slot = await prisma.scheduleSlot.findUnique({ where: { id } });
+        if (!slot) return err('שיבוץ לא נמצא', 404);
+        if (slot.recurringId) {
+          // Delete all slots in the series, then the recurring record
+          await prisma.scheduleSlot.deleteMany({ where: { recurringId: slot.recurringId } });
+          await prisma.recurringSchedule.delete({ where: { id: slot.recurringId } });
+        } else {
+          await prisma.scheduleSlot.delete({ where: { id } });
+        }
+      } else {
+        await prisma.scheduleSlot.delete({ where: { id } });
+      }
+
       return ok({ success: true });
     }
 
