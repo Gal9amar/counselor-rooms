@@ -7,10 +7,9 @@ const DAYS_SHORT = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 const MONTHS_HE = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 const ALL_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 const FREQ_OPTIONS = [
-  { value: 'daily', label: 'יומי', desc: 'שיבוץ בכל יום, החל מהתאריך שנבחר' },
-  { value: 'weekly', label: 'שבועי', desc: 'שיבוץ בימים קבועים בכל שבוע' },
-  { value: 'monthly', label: 'חודשי', desc: 'שיבוץ פעם בחודש, באותו תאריך' },
-  { value: 'yearly', label: 'שנתי', desc: 'שיבוץ פעם בשנה, באותו תאריך' },
+  { value: 'daily',   label: 'יומי',   desc: 'שיבוץ בכל יום, החל מהתאריך שנבחר', unit: 'ימים' },
+  { value: 'weekly',  label: 'שבועי',  desc: 'שיבוץ בימים קבועים בכל שבוע',       unit: 'שבועות' },
+  { value: 'monthly', label: 'חודשי',  desc: 'שיבוץ פעם בחודש, באותו תאריך',      unit: 'חודשים' },
 ];
 
 function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -469,8 +468,8 @@ export default function SchedulePage() {
                         <div className="flex items-center gap-2">
                           <input type="number" min={1} max={200} value={recurOccurrences}
                             onChange={e => setRecurOccurrences(e.target.value)}
-                            className="input w-24 text-center" />
-                          <span className="text-sm text-gray-500">מופעים</span>
+                            className="input w-20 text-center" />
+                          <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
                         </div>
                       ) : (
                         <input type="date" value={recurEndDate} min={selectedDate}
