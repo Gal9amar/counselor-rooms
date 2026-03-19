@@ -79,9 +79,9 @@ export default function SchedulePage(){
     setAllSlots(s);
   };
   const handleSelectDate=async(ds)=>{
-    setSelectedDate(ds);setStep('hour');
+    setSelectedDate(ds);setStep('hour');setStartHour(null);setEndHour('');setBookError('');
     const s=await getSchedule({roomId:selectedRoom.id,date:ds});
-    setDaySlots(s);setStartHour(null);setEndHour('');setBookError('');
+    setDaySlots(s);
   };
   const handleAddYear=async()=>{
     const ny=Math.max(...years)+1;
