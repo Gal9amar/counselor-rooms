@@ -169,10 +169,10 @@ function RoomCard({room,slots,onClick,index}){
           </span>
         </div>
         {active&&(
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-red-400 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
-            <div className="flex items-center gap-2 text-gray-400 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
-            {active.note && <p className="text-xs text-gray-400 italic mt-0.5">{active.note}</p>}
+          <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center gap-2 text-gray-800"><User size={14} className="text-red-400 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
+            <div className="flex items-center gap-2 text-red-600 text-sm font-medium"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
+            {active.note && <p className="text-xs text-gray-400 italic">{active.note}</p>}
           </div>
         )}
         {!active&&next&&(
