@@ -176,11 +176,11 @@ function RoomCard({room,slots,onClick,index}){
           </div>
         )}
         {!active&&next&&(
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>הבא: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
-            <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-500 shrink-0"/><span className="font-medium">{next.therapist.name}</span></div>
-            <div className="flex items-center gap-2 text-green-600 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
-            {next.note && <p className="text-xs text-gray-400 italic mt-0.5">{next.note}</p>}
+          <div className="rounded-xl bg-green-50 border border-green-100 px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-green-600 text-xs font-semibold"><CalendarDays size={12} className="shrink-0"/><span>הבא: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
+            <div className="flex items-center gap-2 text-gray-800"><User size={14} className="text-green-500 shrink-0"/><span className="font-semibold">{next.therapist.name}</span></div>
+            <div className="flex items-center gap-2 text-green-700 text-sm font-medium"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
+            {next.note && <p className="text-xs text-gray-400 italic">{next.note}</p>}
           </div>
         )}
         {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
