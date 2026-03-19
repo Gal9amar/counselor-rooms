@@ -5,11 +5,13 @@ import {
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
   getSchedule, updateSlot, clearSlot,
 } from '../services/api';
-import { Trash2, Plus, LogIn, Pencil, Check, X } from 'lucide-react';
+import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays } from 'lucide-react';
 
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
 const MONTHS_HE=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const ALL_HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
+const FREQ_HE={daily:'יומי',weekly:'שבועי',monthly:'חודשי',yearly:'שנתי'};
 
 function toDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function formatDateHe(ds){const d=new Date(ds+'T00:00:00');return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;}
@@ -157,10 +159,38 @@ export default function AdminPage(){
     catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
   const saveSlot=async(id,sh,eh,tid,nt)=>{const u=await updateSlot(id,sh,eh,tid,nt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
-  const delSlot=async(id)=>{if(!confirm('למחוק?'))return;try{await clearSlot(id);setSlots(slots.filter(s=>s.id!==id));}catch(e){setError(e.response?.data?.error||'שגיאה');}};
 
+  const [deleteModal,setDeleteModal]=useState(null); // {slot}
+
+  const delSlot=async(slot)=>{
+    if(slot.recurringId){setDeleteModal(slot);return;}
+    if(!confirm('למחוק שיבוץ זה?'))return;
+    try{await clearSlot(slot.id,'single');setSlots(p=>p.filter(s=>s.id!==slot.id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+
+  const confirmDelete=async(scope)=>{
+    const slot=deleteModal;setDeleteModal(null);
+    try{
+      await clearSlot(slot.id,scope);
+      if(scope==='all'){setSlots(p=>p.filter(s=>s.recurringId!==slot.recurringId));}
+      else{setSlots(p=>p.filter(s=>s.id!==slot.id));}
+    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+
+  // Separate recurring series from one-time slots
+  const recurringMap={};
+  const oneTimeSlots=[];
+  slots.forEach(s=>{
+    if(s.recurringId){
+      if(!recurringMap[s.recurringId])recurringMap[s.recurringId]=[];
+      recurringMap[s.recurringId].push(s);
+    } else {
+      oneTimeSlots.push(s);
+    }
+  });
   const slotsByDate={};
-  slots.forEach(s=>{const k=toDateStr(new Date(s.date));if(!slotsByDate[k])slotsByDate[k]=[];slotsByDate[k].push(s);});
+  oneTimeSlots.forEach(s=>{const k=toDateStr(new Date(s.date));if(!slotsByDate[k])slotsByDate[k]=[];slotsByDate[k].push(s);});
   const sortedDates=Object.keys(slotsByDate).sort();
 
   if(!authed)return(
@@ -185,6 +215,22 @@ export default function AdminPage(){
 
   return(
     <div className="fade-up">
+      {deleteModal&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setDeleteModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center"><Trash2 size={18} className="text-red-500"/></div>
+              <h3 className="font-bold text-gray-800">מחיקת שיבוץ חוזר</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">שיבוץ זה הוא חלק מסדרה חוזרת. מה ברצונך למחוק?</p>
+            <div className="space-y-2">
+              <button onClick={()=>confirmDelete('single')} className="w-full text-right px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition-colors">מחק רק שיבוץ זה</button>
+              <button onClick={()=>confirmDelete('all')} className="w-full text-right px-4 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-medium text-red-600 transition-colors">מחק את כל הסדרה ({slots.filter(s=>s.recurringId===deleteModal.recurringId).length} שיבוצים)</button>
+              <button onClick={()=>setDeleteModal(null)} className="w-full text-right px-4 py-3 text-sm text-gray-400 hover:text-gray-600 transition-colors">ביטול</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <h1 className="section-title">פאנל מנהל</h1>
         <button onClick={()=>{sessionStorage.removeItem('adminPass');setAuthed(false);}} className="btn-ghost text-sm px-3 py-1.5">יציאה</button>
@@ -230,18 +276,69 @@ export default function AdminPage(){
       )}
 
       {tab==='schedule'&&(
-        <div className="space-y-4">
-          {sortedDates.length===0&&<p className="text-gray-400 text-sm text-center py-10">אין שיבוצים</p>}
-          {sortedDates.map(ds=>(
-            <div key={ds} className="card rounded-2xl overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-gray-100 bg-green-50">
-                <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
+        <div className="space-y-6">
+
+          {/* Recurring series */}
+          {Object.keys(recurringMap).length>0&&(
+            <div>
+              <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><RefreshCw size={14}/> מופעים חוזרים</h2>
+              <div className="space-y-3">
+                {Object.entries(recurringMap).map(([rid,seriesSlots])=>{
+                  const first=seriesSlots[0];
+                  const sorted=[...seriesSlots].sort((a,b)=>new Date(a.date)-new Date(b.date));
+                  const firstDate=toDateStr(new Date(sorted[0].date));
+                  const lastDate=toDateStr(new Date(sorted[sorted.length-1].date));
+                  const days=first.recurring?.daysOfWeek||[];
+                  const freq=first.recurring?.frequency;
+                  return(
+                    <div key={rid} className="card rounded-2xl overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100 bg-blue-50 flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-blue-600 font-semibold text-sm"><RefreshCw size={13}/>{FREQ_HE[freq]||freq}</span>
+                          {days.length>0&&<span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">{days.map(d=>DAYS_SHORT[d]).join(' ')}</span>}
+                          <span className="text-xs text-gray-500">{hLabel(first.startHour)}–{hLabel(first.endHour)}</span>
+                          <span className="text-xs text-gray-400">{first.therapist.name}</span>
+                          {first.room&&<span className="text-xs text-gray-400">· {first.room.name}</span>}
+                        </div>
+                        <button onClick={()=>delSlot({...first,recurringId:parseInt(rid)})} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={15}/></button>
+                      </div>
+                      <div className="px-4 py-2.5 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                        <CalendarDays size={13} className="text-gray-400"/>
+                        <span>{formatDateHe(firstDate)}</span>
+                        <span className="text-gray-300">→</span>
+                        <span>{formatDateHe(lastDate)}</span>
+                        <span className="mr-auto bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{sorted.length} שיבוצים</span>
+                        {first.note&&<span className="italic text-gray-400">· {first.note}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              {slotsByDate[ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
-                <SlotRow key={s.id} slot={s} therapists={therapists} onSave={saveSlot} onDelete={delSlot}/>
-              ))}
             </div>
-          ))}
+          )}
+
+          {/* One-time slots by date */}
+          {sortedDates.length>0&&(
+            <div>
+              <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><CalendarDays size={14}/> שיבוצים חד-פעמיים</h2>
+              <div className="space-y-3">
+                {sortedDates.map(ds=>(
+                  <div key={ds} className="card rounded-2xl overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-green-50">
+                      <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
+                    </div>
+                    {slotsByDate[ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
+                      <SlotRow key={s.id} slot={s} therapists={therapists} onSave={saveSlot} onDelete={()=>delSlot(s)}/>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Object.keys(recurringMap).length===0&&sortedDates.length===0&&(
+            <p className="text-gray-400 text-sm text-center py-10">אין שיבוצים</p>
+          )}
         </div>
       )}
     </div>

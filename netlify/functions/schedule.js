@@ -29,7 +29,7 @@ exports.handler = async (event) => {
       }
       const slots = await prisma.scheduleSlot.findMany({
         where,
-        include: { therapist: true, room: true },
+        include: { therapist: true, room: true, recurring: true },
         orderBy: [{ date: 'asc' }, { startHour: 'asc' }],
       });
       return ok(slots);
