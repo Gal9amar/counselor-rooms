@@ -71,7 +71,10 @@ export default function SchedulePage(){
   const [booking,setBooking]=useState(false);
   const [bookError,setBookError]=useState('');
 
-  useEffect(()=>{Promise.all([getRooms(),getTherapists()]).then(([r,t])=>{setRooms(r);setTherapists(t);setLoading(false);});},[]);
+  useEffect(()=>{Promise.all([getRooms(),getTherapists()]).then(([r,t])=>{
+    const sorted=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
+    setRooms(sorted);setTherapists(t);setLoading(false);
+  });},[]);
 
   const handleSelectRoom=async(room)=>{
     setSelectedRoom(room);setStep('date');setSelectedDate(null);
@@ -136,7 +139,7 @@ export default function SchedulePage(){
         <div className="fade-up">
           <h1 className="section-title mb-1">לוח שיבוצים</h1>
           <p className="text-gray-400 text-sm mb-6">בחר חדר לשיבוץ</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rooms.map((room,i)=>(
               <button key={room.id} onClick={()=>handleSelectRoom(room)}
                 className={`card card-clickable rounded-2xl px-5 py-6 text-right fade-up-${Math.min(i,3)} group`}>
