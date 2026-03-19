@@ -16,6 +16,8 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Only handle http/https requests
+  if (!e.request.url.startsWith('http')) return;
   // API calls — network only
   if (e.request.url.includes('/api/') || e.request.url.includes('/.netlify/')) {
     return e.respondWith(fetch(e.request));
