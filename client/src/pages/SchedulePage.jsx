@@ -7,10 +7,10 @@ const DAYS_SHORT = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 const MONTHS_HE = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 const ALL_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 const FREQ_OPTIONS = [
-  { value: 'daily', label: 'יומי' },
-  { value: 'weekly', label: 'שבועי' },
-  { value: 'monthly', label: 'חודשי' },
-  { value: 'yearly', label: 'שנתי' },
+  { value: 'daily', label: 'יומי', desc: 'שיבוץ בכל יום, החל מהתאריך שנבחר' },
+  { value: 'weekly', label: 'שבועי', desc: 'שיבוץ בימים קבועים בכל שבוע' },
+  { value: 'monthly', label: 'חודשי', desc: 'שיבוץ פעם בחודש, באותו תאריך' },
+  { value: 'yearly', label: 'שנתי', desc: 'שיבוץ פעם בשנה, באותו תאריך' },
 ];
 
 function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -406,7 +406,7 @@ export default function SchedulePage() {
                   <Repeat2 size={16} />
                   שיבוץ חוזר
                   <span className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${isRecurring ? 'bg-green-500' : 'bg-gray-200'}`}>
-                    <span className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${isRecurring ? 'translate-x-4' : 'translate-x-0'}`} />
+                    <span className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${isRecurring ? '-translate-x-4' : 'translate-x-0'}`} />
                   </span>
                 </button>
 
@@ -415,7 +415,7 @@ export default function SchedulePage() {
                     {/* Frequency */}
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-2">תדירות</label>
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap mb-1.5">
                         {FREQ_OPTIONS.map(f => (
                           <button key={f.value} type="button"
                             onClick={() => setRecurFrequency(f.value)}
@@ -428,6 +428,7 @@ export default function SchedulePage() {
                           </button>
                         ))}
                       </div>
+                      <p className="text-xs text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.desc}</p>
                     </div>
 
                     {/* Days of week (weekly only) */}
