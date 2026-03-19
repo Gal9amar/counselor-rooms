@@ -89,29 +89,23 @@ exports.handler = async (event) => {
       if (dates.length === 0)
         return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
 
-      // Check conflicts for ALL dates — block if any conflict
-      const conflicts = [];
-      for (const date of dates) {
-        const overlapping = await prisma.scheduleSlot.findFirst({
-          where: {
-            roomId,
-            date,
-            AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
-          },
-          include: { therapist: true },
-        });
-        if (overlapping) {
-          conflicts.push({
-            date: toDateStr(date),
-            therapist: overlapping.therapist.name,
-            startHour: overlapping.startHour,
-            endHour: overlapping.endHour,
-          });
-        }
-      }
+      // Check conflicts for ALL dates in ONE query
+      const overlapping = await prisma.scheduleSlot.findMany({
+        where: {
+          roomId,
+          date: { in: dates },
+          AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
+        },
+        include: { therapist: true },
+      });
 
-      // If any conflict — block everything, return conflicts
-      if (conflicts.length > 0) {
+      if (overlapping.length > 0) {
+        const conflicts = overlapping.map((s) => ({
+          date: toDateStr(new Date(s.date)),
+          therapist: s.therapist.name,
+          startHour: s.startHour,
+          endHour: s.endHour,
+        }));
         return err(JSON.stringify({ conflicts }), 409);
       }
 
@@ -131,23 +125,25 @@ exports.handler = async (event) => {
         },
       });
 
-      // Create all ScheduleSlot records
-      const createdSlots = await prisma.$transaction(
-        dates.map((date) =>
-          prisma.scheduleSlot.create({
-            data: {
-              roomId,
-              date,
-              startHour,
-              endHour,
-              therapistId,
-              note: note || null,
-              recurringId: recurring.id,
-            },
-            include: { therapist: true, room: true },
-          })
-        )
-      );
+      // Create all slots in one query
+      await prisma.scheduleSlot.createMany({
+        data: dates.map((date) => ({
+          roomId,
+          date,
+          startHour,
+          endHour,
+          therapistId,
+          note: note || null,
+          recurringId: recurring.id,
+        })),
+      });
+
+      // Fetch created slots with relations for the response
+      const createdSlots = await prisma.scheduleSlot.findMany({
+        where: { recurringId: recurring.id },
+        include: { therapist: true, room: true },
+        orderBy: { date: 'asc' },
+      });
 
       return ok({ recurring, slots: createdSlots }, 201);
     }
