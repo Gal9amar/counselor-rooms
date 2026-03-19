@@ -48,14 +48,20 @@ body::before {
   box-shadow: 0 4px 14px rgba(22,163,74,0.1);
 }
 
-/* Active room card */
+/* Occupied room card (red) */
 .card-active {
-  background: linear-gradient(145deg, #f0fdf4, #dcfce7 80%);
-  border-color: #4ade80 !important;
-  box-shadow: 0 6px 24px rgba(22,163,74,0.16), 0 2px 8px rgba(22,163,74,0.08) !important;
+  background: linear-gradient(145deg, #fff5f5, #fee2e2 80%);
+  border-color: #f87171 !important;
+  box-shadow: 0 6px 24px rgba(239,68,68,0.14), 0 2px 8px rgba(239,68,68,0.08) !important;
 }
 .card-active:hover {
-  box-shadow: 0 10px 32px rgba(22,163,74,0.22), 0 3px 10px rgba(22,163,74,0.1) !important;
+  box-shadow: 0 10px 32px rgba(239,68,68,0.2), 0 3px 10px rgba(239,68,68,0.1) !important;
+  border-color: #ef4444 !important;
+}
+
+/* pulse-ring red for occupied */
+.card-active.pulse-ring::after {
+  border-color: rgba(248,113,113,0.6);
 }
 
 /* Buttons */
@@ -141,24 +147,26 @@ body::before {
 
 /* Badge */
 .badge-active {
-  background: linear-gradient(135deg, #bbf7d0, #86efac);
+  background: linear-gradient(135deg, #fee2e2, #fca5a5);
+  color: #991b1b;
+  border: 1px solid #f87171;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(239,68,68,0.25);
+  letter-spacing: 0.01em;
+}
+.badge-free {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
   color: #14532d;
   border: 1px solid #4ade80;
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.2rem 0.65rem;
+  padding: 0.22rem 0.7rem;
   border-radius: 999px;
   box-shadow: 0 1px 4px rgba(22,163,74,0.2);
   letter-spacing: 0.01em;
-}
-.badge-free {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border: 1px solid #e5e7eb;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
 }
 
 /* Nav */

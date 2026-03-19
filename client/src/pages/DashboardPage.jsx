@@ -154,30 +154,37 @@ function RoomCard({room,slots,onClick,index}){
 
   return(
     <button onClick={onClick}
-      className={`w-full text-right rounded-2xl p-5 fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
-        <span className={isActive?'badge-active':'badge-free'}>
-          {isActive?<span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full pulse-dot inline-block"/>פעיל</span>:'פנוי'}
-        </span>
+      className={`w-full text-right rounded-2xl overflow-hidden fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
+      {/* Indicator bar */}
+      <div className={`h-1 w-full ${isActive?'bg-gradient-to-l from-red-400 to-red-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
+          <span className={isActive?'badge-active':'badge-free'}>
+            {isActive
+              ?<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-red-500 rounded-full pulse-dot inline-block"/>תפוס</span>
+              :<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"/>פנוי</span>
+            }
+          </span>
+        </div>
+        {active&&(
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-red-400 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
+            <div className="flex items-center gap-2 text-gray-400 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
+            {active.note && <p className="text-xs text-gray-400 italic mt-0.5">{active.note}</p>}
+          </div>
+        )}
+        {!active&&next&&(
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>הבא: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
+            <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-500 shrink-0"/><span className="font-medium">{next.therapist.name}</span></div>
+            <div className="flex items-center gap-2 text-green-600 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
+            {next.note && <p className="text-xs text-gray-400 italic mt-0.5">{next.note}</p>}
+          </div>
+        )}
+        {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
+        <p className="text-xs text-gray-300 mt-3 pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי</p>
       </div>
-      {active&&(
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-500 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
-          <div className="flex items-center gap-2 text-gray-400 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
-          {active.note && <p className="text-xs text-gray-400 italic mt-0.5">{active.note}</p>}
-        </div>
-      )}
-      {!active&&next&&(
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-gray-400 text-xs"><CalendarDays size={12} className="shrink-0"/><span>שיבוץ קרוב: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
-          <div className="flex items-center gap-2 text-gray-700"><User size={14} className="text-green-400 shrink-0"/><span className="font-medium">{next.therapist.name}</span></div>
-          <div className="flex items-center gap-2 text-green-600 text-sm"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
-          {next.note && <p className="text-xs text-gray-400 italic mt-0.5">{next.note}</p>}
-        </div>
-      )}
-      {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוץ היום</p>}
-      <p className="text-xs text-gray-300 mt-3 pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי</p>
     </button>
   );
 }
@@ -269,19 +276,22 @@ function WhoIsIn({slots}){
   const active=slots.filter(s=>toDateStr(new Date(s.date))===dateStr&&nowDecimal>=s.startHour&&nowDecimal<s.endHour);
   if(!active.length)return null;
   return(
-    <div className="card rounded-2xl p-4 mb-6 fade-up" style={{background:'linear-gradient(135deg,#f0fdf4,#dcfce7)',borderColor:'#bbf7d0'}}>
-      <h2 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
-        <span className="w-2 h-2 bg-green-500 rounded-full pulse-dot inline-block"/>
+    <div className="rounded-2xl p-4 mb-6 fade-up border" style={{background:'linear-gradient(135deg,#fff5f5,#fee2e2)',borderColor:'#fca5a5'}}>
+      <h2 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
+        <span className="w-2 h-2 bg-red-500 rounded-full pulse-dot inline-block"/>
         בבניין עכשיו ({active.length})
       </h2>
       <div className="flex flex-wrap gap-2">
-        {active.map(s=>(
-          <div key={s.id} className="flex items-center gap-2 bg-white border border-green-200 rounded-xl px-3 py-1.5 shadow-sm">
-            <User size={13} className="text-green-500"/>
-            <span className="text-sm font-medium text-gray-700">{s.therapist.name}</span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{s.room.name}</span>
-          </div>
-        ))}
+        {active.map(s=>{
+          const initials=s.therapist.name.split(' ').map(w=>w[0]).slice(0,2).join('');
+          return(
+            <div key={s.id} className="flex items-center gap-2 bg-white border border-red-100 rounded-xl px-3 py-1.5 shadow-sm">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{initials}</div>
+              <span className="text-sm font-medium text-gray-700">{s.therapist.name}</span>
+              <span className="text-xs text-gray-400 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-md">{s.room.name}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -316,7 +326,7 @@ export default function DashboardPage(){
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 fade-up">
         <div>
-          <h1 className="section-title">דשבורד</h1>
+          <h1 className="section-title">לוח חדרים</h1>
           <p className="text-gray-400 text-sm mt-1">
             {DAYS_HE[now.getDay()]} {now.getDate()} {MONTHS_HE[now.getMonth()]} ·{' '}
             <span className="text-green-600 font-medium">{activeCount}</span> מתוך {rooms.length} חדרים פעילים

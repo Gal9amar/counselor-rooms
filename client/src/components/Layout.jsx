@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CalendarDays, User, Settings, Download } from 'lucide-react';
 
 const navItems = [
-  { to: '/', label: 'דשבורד', icon: LayoutDashboard },
+  { to: '/', label: 'לוח חדרים', icon: LayoutDashboard },
   { to: '/schedule', label: 'לוח שיבוצים', icon: CalendarDays },
   { to: '/my-schedule', label: 'השיבוצים שלי', icon: User },
   { to: '/admin', label: 'מנהל', icon: Settings },
