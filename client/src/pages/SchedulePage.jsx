@@ -468,7 +468,7 @@ export default function SchedulePage() {
                         <div className="flex items-center gap-2">
                           <input type="number" min={1} max={200} value={recurOccurrences}
                             onChange={e => setRecurOccurrences(e.target.value)}
-                            className="input w-20 text-center" />
+                            className="input text-center" style={{width:'5rem'}} />
                           <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
                         </div>
                       ) : (
