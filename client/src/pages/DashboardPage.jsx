@@ -154,18 +154,19 @@ function RoomCard({room,slots,onClick,index}){
 
   return(
     <button onClick={onClick}
-      className={`w-full text-right rounded-2xl overflow-hidden fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
+      className={`w-full text-right rounded-2xl overflow-hidden fade-up-${Math.min(index,3)} card card-clickable flex flex-col ${isActive?'card-active pulse-ring':''}`}
+      style={{minHeight:'160px'}}>
       {/* Indicator bar */}
-      <div className={`h-1 w-full ${isActive?'bg-gradient-to-l from-red-400 to-red-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
-      <div className="p-5">
+      <div className={`h-1 w-full shrink-0 ${isActive?'bg-gradient-to-l from-red-400 to-red-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
+      <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
           <span className={isActive?'badge-active':'badge-free'}>
             {isActive
               ?<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-red-500 rounded-full pulse-dot inline-block"/>תפוס</span>
               :<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"/>פנוי</span>
             }
           </span>
-          <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
         </div>
         {active&&(
           <div className="space-y-1.5">
@@ -183,7 +184,7 @@ function RoomCard({room,slots,onClick,index}){
           </div>
         )}
         {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
-        <p className="text-xs text-gray-300 mt-3 pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי</p>
+        <p className="text-xs text-gray-300 mt-auto pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי</p>
       </div>
     </button>
   );
