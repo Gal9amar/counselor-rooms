@@ -277,23 +277,14 @@ function WhoIsIn({slots}){
   const active=slots.filter(s=>toDateStr(new Date(s.date))===dateStr&&nowDecimal>=s.startHour&&nowDecimal<s.endHour);
   if(!active.length)return null;
   return(
-    <div className="rounded-2xl p-4 mb-6 fade-up border" style={{background:'linear-gradient(135deg,#fff5f5,#fee2e2)',borderColor:'#fca5a5'}}>
-      <h2 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
-        <span className="w-2 h-2 bg-red-500 rounded-full pulse-dot inline-block"/>
-        בבניין עכשיו ({active.length})
-      </h2>
-      <div className="flex flex-wrap gap-2">
-        {active.map(s=>{
-          const initials=s.therapist.name.split(' ').map(w=>w[0]).slice(0,2).join('');
-          return(
-            <div key={s.id} className="flex items-center gap-2 bg-white border border-red-100 rounded-xl px-3 py-1.5 shadow-sm">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{initials}</div>
-              <span className="text-sm font-medium text-gray-700">{s.therapist.name}</span>
-              <span className="text-xs text-gray-400 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-md">{s.room.name}</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="rounded-2xl px-4 py-3 mb-6 fade-up border border-gray-200 bg-white flex items-center gap-3 flex-wrap">
+      <span className="text-sm font-semibold text-gray-700 shrink-0">בבניין עכשיו:</span>
+      {active.map(s=>(
+        <span key={s.id} className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 rounded-full px-3 py-1 text-sm text-gray-800 font-medium">
+          {s.therapist.name}
+          <span className="text-xs text-gray-400 font-normal">· {s.room.name}</span>
+        </span>
+      ))}
     </div>
   );
 }
