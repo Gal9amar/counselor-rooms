@@ -64,14 +64,14 @@ export default function Layout() {
                   <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-green-100' : ''}`}>
                     <Icon size={20} />
                   </div>
-                  <span className="leading-tight text-center" style={{fontSize:'0.65rem'}}>{label}</span>
+                  <span className="leading-tight text-center text-xs">{label}</span>
                 </>
               )}
             </NavLink>
           ))}
         </div>
         {/* Copyright strip */}
-        <div className="border-t border-gray-100 py-1 text-center" style={{fontSize:'0.6rem', color:'#d1d5db'}}>
+        <div className="border-t border-gray-100 py-1 text-center text-xs text-gray-300">
           © 2026 כל הזכויות שמורות לגל עמר
         </div>
       </nav>

@@ -38,10 +38,11 @@ export default function MySchedulePage() {
     if (!selectedId) { setSlots([]); return; }
     localStorage.setItem('myScheduleTherapistId', selectedId);
     setLoading(true);
-    const past = new Date('2020-01-01');
+    const past = new Date(); past.setFullYear(past.getFullYear() - 5);
     const future = new Date(); future.setFullYear(future.getFullYear() + 2);
+    const parsedId = parseInt(selectedId, 10);
     getSchedule({ from: toDateStr(past), to: toDateStr(future) })
-      .then(all => setSlots(all.filter(s => s.therapistId === parseInt(selectedId))))
+      .then(all => setSlots(!isNaN(parsedId) ? all.filter(s => s.therapistId === parsedId) : []))
       .finally(() => setLoading(false));
   }, [selectedId]);
 
@@ -67,7 +68,7 @@ export default function MySchedulePage() {
     return Object.keys(map).sort().map(date => ({ date, slots: map[date].sort((a,b) => a.startHour - b.startHour) }));
   }, [slots, filter]);
 
-  const therapistName = therapists.find(t => t.id === parseInt(selectedId))?.name;
+  const therapistName = therapists.find(t => t.id === parseInt(selectedId, 10))?.name;
 
   // Stats
   const todayDateStr = toDateStr(new Date());

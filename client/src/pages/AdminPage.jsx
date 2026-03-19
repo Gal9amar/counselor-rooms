@@ -147,7 +147,7 @@ export default function AdminPage(){
   const renT=async(id,n)=>{try{await updateTherapist(id,n);setTherapists(p=>p.map(t=>t.id===id?{...t,name:n}:t));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
   const delT=async(id)=>{
     const t=therapists.find(t=>t.id===id);
-    const slotRes=await fetch(`/api/schedule?from=2020-01-01&to=2030-12-31`).then(r=>r.json()).catch(()=>[]);
+    const slotRes=await getSchedule({from:'2020-01-01',to:'2030-12-31'}).catch(()=>[]);
     const cnt=Array.isArray(slotRes)?slotRes.filter(s=>s.therapistId===id).length:0;
     const msg=cnt>0
       ?`למטפל "${t?.name}" יש ${cnt} שיבוצים.\nמחיקתו תמחק גם את כל השיבוצים שלו.\nלהמשיך?`
