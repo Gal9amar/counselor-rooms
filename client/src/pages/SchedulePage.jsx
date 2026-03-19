@@ -199,8 +199,8 @@ export default function SchedulePage(){
               const isSelected=startHour===h;
               const occupant=daySlots.find(s=>h>=s.startHour&&h<s.endHour);
               return(
-                <button key={h} disabled={occupied}
-                  onClick={()=>!occupied&&(setStartHour(h),setEndHour(''),setBookError(''))}
+                <button key={h} disabled={occupied} type="button"
+                  onClick={()=>{ if(occupied) return; setStartHour(h); setEndHour(''); setBookError(''); }}
                   title={occupied?occupant?.therapist?.name:''}
                   className={`rounded-xl py-3 text-sm font-medium transition-all border ${
                     isSelected?'bg-green-500 text-white border-green-500 shadow-md shadow-green-200'
@@ -247,7 +247,7 @@ export default function SchedulePage(){
                   className="btn-primary flex-1 py-2.5 px-4">
                   {booking?'שומר...':`אשר שיבוץ ${hLabel(startHour)}–${endHour?hLabel(parseInt(endHour)):''}`}
                 </button>
-                <button onClick={()=>{setStartHour(null);setEndHour('');setBookError('');}} className="btn-secondary px-4 py-2.5">ביטול</button>
+                <button type="button" onClick={()=>{setStartHour(null);setEndHour('');setBookError('');}} className="btn-secondary px-4 py-2.5">ביטול</button>
               </div>
             </div>
           )}
