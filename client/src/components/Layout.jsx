@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, User, Settings } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, User, Settings, Download } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'דשבורד', icon: LayoutDashboard },
@@ -10,6 +10,22 @@ const navItems = [
 ];
 
 export default function Layout() {
+  const [installPrompt, setInstallPrompt] = useState(null);
+
+  useEffect(() => {
+    const check = () => { if (window.__installPrompt) setInstallPrompt(window.__installPrompt); };
+    check();
+    window.addEventListener('beforeinstallprompt', check);
+    return () => window.removeEventListener('beforeinstallprompt', check);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    window.__installPrompt = null;
+    setInstallPrompt(null);
+  };
+
   return (
     <div className="min-h-screen pb-20 sm:pb-0" dir="rtl">
 
@@ -34,8 +50,15 @@ export default function Layout() {
               ))}
             </div>
 
-            {/* Logo left — אופק */}
-            <img src="/logo-right.png" alt="אופק" className="h-10 w-auto object-contain" />
+            {/* Logo left — אופק + install button */}
+            <div className="flex items-center gap-3">
+              {installPrompt && (
+                <button onClick={handleInstall} className="flex items-center gap-1.5 text-xs text-green-600 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 transition-colors">
+                  <Download size={14} /> התקן אפליקציה
+                </button>
+              )}
+              <img src="/logo-right.png" alt="אופק" className="h-10 w-auto object-contain" />
+            </div>
           </div>
         </div>
       </nav>

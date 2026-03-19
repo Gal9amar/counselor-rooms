@@ -12,14 +12,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// PWA install prompt — store event for later use
+// PWA install prompt — store event, trigger only on user gesture
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   window.__installPrompt = e;
-  // Show install banner after 3 seconds if not dismissed
-  setTimeout(() => {
-    if (window.__installPrompt) {
-      window.__installPrompt.prompt();
-    }
-  }, 3000);
 });
