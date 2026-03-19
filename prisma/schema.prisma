@@ -24,37 +24,18 @@ model Therapist {
 }
 
 model ScheduleSlot {
-  id          Int               @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   roomId      Int
-  date        DateTime          // specific date, time part ignored (stored as midnight UTC)
-  startHour   Int               // 8..21
-  endHour     Int               // 9..22
+  date        DateTime // specific date, time part ignored (stored as midnight UTC)
+  startHour   Int      // 8..21
+  endHour     Int      // 9..22
   therapistId Int
-  note        String?           // הערה אופציונלית
-  recurringId Int?              // null = one-time slot
-  createdAt   DateTime          @default(now())
-  room        Room              @relation(fields: [roomId], references: [id])
-  therapist   Therapist         @relation(fields: [therapistId], references: [id])
-  recurring   RecurringSchedule? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  note        String?  // הערה אופציונלית
+  createdAt   DateTime @default(now())
+  room        Room     @relation(fields: [roomId], references: [id])
+  therapist   Therapist @relation(fields: [therapistId], references: [id])
 
   @@index([roomId, date])
   @@index([therapistId])
   @@index([date])
-  @@index([recurringId])
-}
-
-model RecurringSchedule {
-  id          Int            @id @default(autoincrement())
-  roomId      Int
-  therapistId Int
-  startHour   Int
-  endHour     Int
-  note        String?
-  frequency   String         // "daily" | "weekly" | "monthly" | "yearly"
-  daysOfWeek  Int[]          // for weekly: [0=Sun,1=Mon,...,5=Fri] (empty for other frequencies)
-  startDate   DateTime
-  endDate     DateTime?
-  occurrences Int?
-  createdAt   DateTime       @default(now())
-  slots       ScheduleSlot[]
 }
