@@ -159,13 +159,13 @@ function RoomCard({room,slots,onClick,index}){
       <div className={`h-1 w-full ${isActive?'bg-gradient-to-l from-red-400 to-red-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
           <span className={isActive?'badge-active':'badge-free'}>
             {isActive
               ?<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-red-500 rounded-full pulse-dot inline-block"/>תפוס</span>
               :<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"/>פנוי</span>
             }
           </span>
+          <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
         </div>
         {active&&(
           <div className="space-y-1.5">
