@@ -20,34 +20,57 @@ function generateDates({ frequency, daysOfWeek, startDate, endDate, occurrences 
   const end = endDate ? toMidnightUTC(endDate) : null;
   const maxOccurrences = occurrences || 365; // safety cap
 
+  // Safety cap: 5 years from start
+  const fiveYears = new Date(start);
+  fiveYears.setUTCFullYear(fiveYears.getUTCFullYear() + 5);
+
   let current = new Date(start);
 
-  while (dates.length < maxOccurrences) {
-    if (end && current > end) break;
+  if (frequency === 'weekly') {
+    // For weekly: occurrences = number of weeks, not individual days
+    // Each week that contains at least one selected day counts as one occurrence
+    let weekCount = 0;
+    // Find the Sunday of the start week
+    const startWeekSunday = new Date(start);
+    startWeekSunday.setUTCDate(start.getUTCDate() - start.getUTCDay());
 
-    if (frequency === 'daily') {
-      dates.push(new Date(current));
-      current.setUTCDate(current.getUTCDate() + 1);
-    } else if (frequency === 'weekly') {
-      // daysOfWeek: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
-      if (daysOfWeek.includes(current.getUTCDay())) {
-        dates.push(new Date(current));
+    let weekStart = new Date(startWeekSunday);
+    while (weekCount < maxOccurrences) {
+      if (end && weekStart > end) break;
+      if (weekStart > fiveYears) break;
+
+      // Add all selected days within this week that are >= start date
+      let addedInWeek = false;
+      for (let d = 0; d < 7; d++) {
+        if (!daysOfWeek.includes(d)) continue;
+        const day = new Date(weekStart);
+        day.setUTCDate(weekStart.getUTCDate() + d);
+        if (day < start) continue; // skip days before startDate in first week
+        if (end && day > end) continue;
+        dates.push(new Date(day));
+        addedInWeek = true;
       }
-      current.setUTCDate(current.getUTCDate() + 1);
-    } else if (frequency === 'monthly') {
-      dates.push(new Date(current));
-      current.setUTCMonth(current.getUTCMonth() + 1);
-    } else if (frequency === 'yearly') {
-      dates.push(new Date(current));
-      current.setUTCFullYear(current.getUTCFullYear() + 1);
-    } else {
-      break;
+      if (addedInWeek) weekCount++;
+      weekStart.setUTCDate(weekStart.getUTCDate() + 7);
     }
+  } else {
+    while (dates.length < maxOccurrences) {
+      if (end && current > end) break;
+      if (current > fiveYears) break;
 
-    // Safety: stop if we've gone more than 5 years out
-    const fiveYears = new Date(start);
-    fiveYears.setUTCFullYear(fiveYears.getUTCFullYear() + 5);
-    if (current > fiveYears) break;
+      if (frequency === 'daily') {
+        dates.push(new Date(current));
+        current.setUTCDate(current.getUTCDate() + 1);
+      } else if (frequency === 'monthly') {
+        dates.push(new Date(current));
+        current.setUTCMonth(current.getUTCMonth() + 1);
+      } else if (frequency === 'yearly') {
+        dates.push(new Date(current));
+        current.setUTCFullYear(current.getUTCFullYear() + 1);
+      } else {
+        break;
+      }
+    }
   }
 
   return dates;
