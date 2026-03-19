@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CalendarDays, User, Settings, Download } from 'lucide-react';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
 ];
 
 export default function Layout() {
+  const navigate = useNavigate();
   const [installPrompt, setInstallPrompt] = useState(null);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function Layout() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo right — חוף אשקלון */}
-            <img src="/logo-left.png" alt="חוף אשקלון" className="h-10 w-auto object-contain" />
+            <img src="/logo-left.png" alt="חוף אשקלון" className="h-10 w-auto object-contain cursor-pointer" onClick={() => navigate('/')} />
 
             {/* Nav links centered */}
             <div className="flex items-center gap-1">
@@ -66,8 +67,8 @@ export default function Layout() {
       {/* Mobile top bar with logos */}
       <header className="sm:hidden bg-white border-b border-gray-100 shadow-sm">
         <div className="flex items-center justify-between px-4 h-14">
-          <img src="/logo-left.png" alt="חוף אשקלון" className="h-9 w-auto object-contain" />
-          <img src="/logo-right.png" alt="אופק" className="h-9 w-auto object-contain" />
+          <img src="/logo-left.png" alt="חוף אשקלון" className="h-9 w-auto object-contain cursor-pointer" onClick={() => navigate('/')} />
+          <img src="/logo-right.png" alt="אופק" className="h-9 w-auto object-contain cursor-pointer" onClick={() => navigate('/')} />
         </div>
       </header>
 
