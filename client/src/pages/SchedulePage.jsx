@@ -139,9 +139,12 @@ export default function SchedulePage(){
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {rooms.map((room,i)=>(
               <button key={room.id} onClick={()=>handleSelectRoom(room)}
-                className={`card card-clickable rounded-2xl px-5 py-5 text-right fade-up-${Math.min(i,3)}`}>
-                <span className="font-semibold text-gray-800 text-base">{room.name}</span>
-                <p className="text-xs text-gray-400 mt-1">לחץ לשיבוץ</p>
+                className={`card card-clickable rounded-2xl px-5 py-6 text-right fade-up-${Math.min(i,3)} group`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-800 text-base">{room.name}</span>
+                  <span className="text-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-lg">←</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">לחץ לשיבוץ</p>
               </button>
             ))}
           </div>
@@ -202,7 +205,7 @@ export default function SchedulePage(){
                 <button key={h} disabled={occupied} type="button"
                   onClick={()=>{ if(occupied) return; setStartHour(h); setEndHour(''); setBookError(''); }}
                   title={occupied?occupant?.therapist?.name:''}
-                  className={`rounded-xl py-3 text-sm font-medium transition-all border ${
+                  className={`hour-btn rounded-xl py-3 text-sm font-medium border ${
                     isSelected?'bg-green-500 text-white border-green-500 shadow-md shadow-green-200'
                     :occupied?'bg-gray-100 text-gray-300 border-gray-100 cursor-not-allowed'
                     :'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700 hover:bg-green-50'

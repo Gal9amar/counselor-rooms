@@ -43,7 +43,7 @@ function RoomModal({room,onClose}){
 
   return(
     <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col fade-up border border-gray-100" onClick={e=>e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col scale-in border border-gray-100" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-800">{room.name}</h2>
@@ -154,7 +154,7 @@ function RoomCard({room,slots,onClick,index}){
 
   return(
     <button onClick={onClick}
-      className={`w-full text-right rounded-2xl p-5 border-2 transition-all duration-200 fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active':''}`}>
+      className={`w-full text-right rounded-2xl p-5 border-2 transition-all duration-250 fade-up-${Math.min(index,3)} card card-clickable ${isActive?'card-active pulse-ring':''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
         <span className={isActive?'badge-active':'badge-free'}>
