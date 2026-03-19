@@ -48,14 +48,14 @@ body::before {
   box-shadow: 0 4px 14px rgba(22,163,74,0.1);
 }
 
-/* Occupied room card (red) */
+/* Occupied room card (white bg, red border) */
 .card-active {
-  background: linear-gradient(145deg, #fff5f5, #fee2e2 80%);
+  background: #ffffff;
   border-color: #f87171 !important;
-  box-shadow: 0 6px 24px rgba(239,68,68,0.14), 0 2px 8px rgba(239,68,68,0.08) !important;
+  box-shadow: 0 6px 24px rgba(239,68,68,0.12), 0 2px 8px rgba(239,68,68,0.06) !important;
 }
 .card-active:hover {
-  box-shadow: 0 10px 32px rgba(239,68,68,0.2), 0 3px 10px rgba(239,68,68,0.1) !important;
+  box-shadow: 0 10px 32px rgba(239,68,68,0.18), 0 3px 10px rgba(239,68,68,0.08) !important;
   border-color: #ef4444 !important;
 }
 
