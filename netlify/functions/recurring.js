@@ -171,6 +171,62 @@ exports.handler = async (event) => {
       return ok({ recurring, slots: createdSlots }, 201);
     }
 
+    // PATCH /api/recurring/:id — update series metadata + all its slots
+    if (httpMethod === 'PATCH') {
+      const { path, headers } = event;
+      const { checkAdmin } = require('./lib/helpers');
+      if (!checkAdmin(headers)) return err('Unauthorized', 401);
+
+      const parts = path.split('/').filter(Boolean);
+      const id = parseInt(parts[parts.length - 1]);
+      if (isNaN(id)) return err('id לא תקין', 400);
+
+      const { roomId, therapistId, startHour, endHour, note } = JSON.parse(body || '{}');
+      if (!roomId || !therapistId || startHour == null || endHour == null)
+        return err('roomId, therapistId, startHour, endHour נדרשים', 400);
+      if (endHour <= startHour)
+        return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
+
+      const existing = await prisma.recurringSchedule.findUnique({ where: { id } });
+      if (!existing) return err('סדרה לא נמצאה', 404);
+
+      // Check conflicts on all slots of this series with new values
+      const seriesSlots = await prisma.scheduleSlot.findMany({ where: { recurringId: id } });
+      const conflicts = [];
+      for (const slot of seriesSlots) {
+        const overlapping = await prisma.scheduleSlot.findFirst({
+          where: {
+            id: { not: slot.id },
+            roomId,
+            date: slot.date,
+            AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
+          },
+          include: { therapist: true },
+        });
+        if (overlapping) conflicts.push({ date: toDateStr(new Date(slot.date)), therapist: overlapping.therapist.name });
+      }
+      if (conflicts.length > 0) return err(JSON.stringify({ conflicts }), 409);
+
+      // Update RecurringSchedule record
+      await prisma.recurringSchedule.update({
+        where: { id },
+        data: { roomId, therapistId, startHour, endHour, note: note || null },
+      });
+
+      // Update all slots
+      await prisma.scheduleSlot.updateMany({
+        where: { recurringId: id },
+        data: { roomId, therapistId, startHour, endHour, note: note || null },
+      });
+
+      const updatedSlots = await prisma.scheduleSlot.findMany({
+        where: { recurringId: id },
+        include: { therapist: true, room: true, recurring: true },
+        orderBy: { date: 'asc' },
+      });
+      return ok(updatedSlots);
+    }
+
     return err('Method not allowed', 405);
   } catch (e) {
     return err(e.message);

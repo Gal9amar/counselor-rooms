@@ -47,6 +47,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/recurring/*"
+  to = "/.netlify/functions/recurring/:splat"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/*"
   to = "/.netlify/functions/admin/:splat"
   status = 200

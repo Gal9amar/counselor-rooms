@@ -41,6 +41,7 @@ export const clearSlot = (id, scope = 'single') =>
 
 // Recurring
 export const bookRecurring = (data) => api.post('/recurring', data).then((r) => r.data);
+export const updateRecurring = (id, data) => api.patch(`/recurring/${id}`, data).then((r) => r.data);
 
 // Admin
 export const verifyAdmin = (password) =>

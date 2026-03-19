@@ -3,7 +3,7 @@ import {
   verifyAdmin, setAdminPassword,
   getRooms, addRoom, updateRoom, deleteRoom,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
-  getSchedule, updateSlot, clearSlot,
+  getSchedule, updateSlot, clearSlot, updateRecurring,
 } from '../services/api';
 import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays } from 'lucide-react';
 
@@ -161,7 +161,30 @@ export default function AdminPage(){
   };
   const saveSlot=async(id,sh,eh,tid,nt,rid,dt)=>{const u=await updateSlot(id,sh,eh,tid,nt,rid,dt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
 
-  const [deleteModal,setDeleteModal]=useState(null); // {slot}
+  const openEditRecurring=(rid,seriesSlots)=>{
+    const first=seriesSlots[0];
+    setEditRecurring({rid:parseInt(rid),roomId:first.roomId,therapistId:first.therapistId,startHour:first.startHour,endHour:first.endHour,note:first.note||''});
+    setEditRecurringErr('');
+  };
+  const saveRecurring=async()=>{
+    const {rid,roomId,therapistId,startHour,endHour,note}=editRecurring;
+    if(endHour<=startHour){setEditRecurringErr('סיום אחרי התחלה');return;}
+    setEditRecurringSaving(true);setEditRecurringErr('');
+    try{
+      const updated=await updateRecurring(rid,{roomId,therapistId,startHour,endHour,note:note||null});
+      setSlots(p=>p.map(s=>s.recurringId===rid?updated.find(u=>u.id===s.id)||s:s));
+      setEditRecurring(null);
+    }catch(e){
+      const data=e.response?.data?.error;
+      try{const parsed=JSON.parse(data);if(parsed.conflicts)setEditRecurringErr(`התנגשות ב-${parsed.conflicts.length} תאריכים`);}
+      catch{setEditRecurringErr(data||'שגיאה');}
+    }finally{setEditRecurringSaving(false);}
+  };
+
+  const [deleteModal,setDeleteModal]=useState(null);
+  const [editRecurring,setEditRecurring]=useState(null); // {rid, roomId, therapistId, startHour, endHour, note}
+  const [editRecurringErr,setEditRecurringErr]=useState('');
+  const [editRecurringSaving,setEditRecurringSaving]=useState(false);
 
   const delSlot=async(slot)=>{
     if(slot.recurringId){setDeleteModal(slot);return;}
@@ -216,6 +239,56 @@ export default function AdminPage(){
 
   return(
     <div className="fade-up">
+      {editRecurring&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setEditRecurring(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2"><RefreshCw size={16} className="text-blue-500"/> עריכת סדרה חוזרת</h3>
+              <button onClick={()=>setEditRecurring(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">חדר</label>
+                <select className="input py-2 text-sm" value={editRecurring.roomId} onChange={e=>setEditRecurring(p=>({...p,roomId:parseInt(e.target.value)}))}>
+                  {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">מטפל</label>
+                <select className="input py-2 text-sm" value={editRecurring.therapistId} onChange={e=>setEditRecurring(p=>({...p,therapistId:parseInt(e.target.value)}))}>
+                  {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת התחלה</label>
+                  <select className="input py-2 text-sm" value={editRecurring.startHour} onChange={e=>setEditRecurring(p=>({...p,startHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת סיום</label>
+                  <select className="input py-2 text-sm" value={editRecurring.endHour} onChange={e=>setEditRecurring(p=>({...p,endHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.filter(h=>h>editRecurring.startHour).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">הערה</label>
+                <input className="input py-2 text-sm" placeholder="הערה (לא חובה)" value={editRecurring.note}
+                  onChange={e=>setEditRecurring(p=>({...p,note:e.target.value}))} maxLength={200}/>
+              </div>
+              {editRecurringErr&&<p className="text-red-500 text-xs">{editRecurringErr}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={saveRecurring} disabled={editRecurringSaving} className="btn-primary flex-1 py-2.5 text-sm">
+                  {editRecurringSaving?'שומר...':'שמור שינויים'}
+                </button>
+                <button onClick={()=>setEditRecurring(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteModal&&(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setDeleteModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
@@ -301,7 +374,10 @@ export default function AdminPage(){
                           <span className="text-xs text-gray-400">{first.therapist.name}</span>
                           {first.room&&<span className="text-xs text-gray-400">· {first.room.name}</span>}
                         </div>
-                        <button onClick={()=>delSlot({...first,recurringId:parseInt(rid)})} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={15}/></button>
+                        <div className="flex gap-1">
+                          <button onClick={()=>openEditRecurring(rid,seriesSlots)} className="text-gray-300 hover:text-blue-500 transition-colors p-1"><Pencil size={14}/></button>
+                          <button onClick={()=>delSlot({...first,recurringId:parseInt(rid)})} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={15}/></button>
+                        </div>
                       </div>
                       <div className="px-4 py-2.5 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                         <CalendarDays size={13} className="text-gray-400"/>
