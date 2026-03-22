@@ -440,7 +440,7 @@ function TimelineView({rooms,slots}){
                   <div key={ds} className={`flex items-stretch ${col.bg}`}>
                     <div className={`w-24 shrink-0 px-2 py-2 flex items-center border-r-2 ${col.border}`}>
                       <div className="text-center w-full">
-                        <div className={`text-xs font-bold ${isToday?'text-green-700':col.label}`}>{DAYS_HE[day.getDay()].slice(0,3)}</div>
+                        <div className={`text-xs font-bold ${isToday?'text-green-700':col.label}`}>{['א','ב','ג','ד','ה','ו','ש'][day.getDay()]}</div>
                         <div className="text-xs text-gray-500">{day.getDate()}/{day.getMonth()+1}</div>
                         {isToday&&<div className="w-1.5 h-1.5 bg-green-500 rounded-full mx-auto mt-0.5 pulse-dot"/>}
                       </div>
