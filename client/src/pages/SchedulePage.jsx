@@ -317,20 +317,21 @@ export default function SchedulePage() {
                 {(()=>{
                   const todayD=new Date();todayD.setHours(0,0,0,0);
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
-                  const months=Array.from({length:4},(_,mi)=>{
+                  const months=Array.from({length:3},(_,mi)=>{
                     const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
                     const y=d.getFullYear(),m=d.getMonth();
                     const dim=new Date(y,m+1,0).getDate();
-                    const SLOT_HOURS=13; // 8-21 = 13 slots
+                    // Use toDateStr to avoid timezone issues
+                    const pad=(n)=>String(n).padStart(2,'0');
                     let bookedDays=0,freeDays=0;
                     for(let dd=1;dd<=dim;dd++){
                       const dow=new Date(y,m,dd).getDay();
-                      if(dow===6)continue; // skip Saturday
-                      // Count booked hours this day
-                      const daySlots=roomSlots.filter(s=>{const sd=new Date(s.date);return sd.getFullYear()===y&&sd.getMonth()===m&&sd.getDate()===dd;});
+                      if(dow===6)continue;
+                      const dsKey=`${y}-${pad(m+1)}-${pad(dd)}`;
+                      const daySlots=roomSlots.filter(s=>toDateStr(new Date(s.date))===dsKey);
                       const bookedHours=daySlots.reduce((acc,s)=>acc+(s.endHour-s.startHour),0);
-                      if(bookedHours>=SLOT_HOURS){bookedDays++;} // fully booked
-                      else{freeDays++;} // has free hours (including days with 0 slots)
+                      if(bookedHours>=13){bookedDays++;}
+                      else{freeDays++;}
                     }
                     const workDays=bookedDays+freeDays;
                     const pct=workDays>0?Math.round((bookedDays/workDays)*100):0;
