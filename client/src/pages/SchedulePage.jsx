@@ -317,7 +317,11 @@ export default function SchedulePage() {
             <div>
               <h1 className="section-title">{selectedRoom.name}</h1>
               <p className="text-gray-400 text-sm">בחר תאריך לשיבוץ</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0 inline-block"/>
+              <span className="text-sm font-semibold text-gray-700">נקודה ירוקה = יש שיבוצים באותו יום</span>
             </div>
+          </div>
             <button onClick={handleAddYear} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-2 whitespace-nowrap">
               <Plus size={15} /> הוסף שנה ({Math.max(...years) + 1})
             </button>
