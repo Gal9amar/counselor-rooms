@@ -10,7 +10,12 @@ export const LoadingContext = createContext({ loading: false, setLoading: () => 
 export function useLoading() { return useContext(LoadingContext); }
 
 function LoadingOverlay() {
-  const { loading } = useLoading();
+  const { loading, setLoading } = useLoading();
+  React.useEffect(() => {
+    const handler = (e) => setLoading(e.detail.active);
+    window.addEventListener('apiLoading', handler);
+    return () => window.removeEventListener('apiLoading', handler);
+  }, [setLoading]);
   if (!loading) return null;
   return (
     <div className="loading-overlay">
