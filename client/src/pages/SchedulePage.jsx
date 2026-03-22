@@ -396,7 +396,7 @@ export default function SchedulePage() {
 
               <div>
                 {(() => {
-                  const _isAgaf = therapists.find(t => t.id === parseInt(selectedTherapist))?.name === 'אגף רווחה';
+                  const _isAgaf = therapists.find(t => String(t.id) === String(selectedTherapist))?.name === 'אגף רווחה';
                   return (
                     <>
                       <label className="block text-sm font-medium text-gray-600 mb-1.5">
