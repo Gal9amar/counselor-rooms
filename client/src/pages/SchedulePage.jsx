@@ -320,6 +320,7 @@ export default function SchedulePage() {
                   const dim=new Date(y,m+1,0).getDate();
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
                   // Count unique days with slots this month using date string
+                  console.log('room',room.id,'allSlots',allSlots.length,'roomSlots',roomSlots.length, roomSlots.slice(0,2).map(s=>s.date));
                   const bookedDateSet=new Set();
                   roomSlots.forEach(s=>{
                     const sd=new Date(s.date);
