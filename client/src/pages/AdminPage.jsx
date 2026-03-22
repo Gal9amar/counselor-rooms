@@ -433,26 +433,32 @@ export default function AdminPage(){
                       const days=first.recurring?.daysOfWeek||[];
                       const freq=first.recurring?.frequency;
                       return(
-                        <div key={rid} className="px-4 py-3 border-b border-gray-100 bg-blue-50">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <RefreshCw size={13} className="text-blue-500 shrink-0"/>
-                              <span className="text-sm font-semibold text-blue-700">{FREQ_HE[freq]||freq}</span>
-                              {days.length>0&&<span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">{days.map(d=>DAYS_SHORT[d]).join(' ')}</span>}
-                              <span className="text-xs text-gray-500">{hLabel(first.startHour)}–{hLabel(first.endHour)}</span>
-                              <span className="text-xs text-gray-600 font-medium">{first.therapist.name}</span>
-                              <span className="text-xs text-gray-400">{firstDate} → {lastDate}</span>
-                            </div>
+                        <div key={rid} className="border-b border-blue-100 bg-blue-50">
+                          {/* Date header row */}
+                          <div className="px-4 py-2 border-b border-blue-100 flex items-center justify-between">
+                            <span className="font-bold text-blue-700 text-sm flex items-center gap-1.5">
+                              <RefreshCw size={12} className="shrink-0"/>
+                              {firstDate} → {lastDate}
+                            </span>
                             <div className="flex gap-1 shrink-0">
                               <button onClick={()=>openEditRecurring(rid,series)} className="text-gray-300 hover:text-blue-500 transition-colors p-1"><Pencil size={14}/></button>
                               <button onClick={()=>handleDeleteRecurring(rid)} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={14}/></button>
                             </div>
                           </div>
-                          {first.note&&(
-                            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1.5 flex items-start gap-1">
-                              <span className="shrink-0">📝</span>{first.note}
-                            </p>
-                          )}
+                          {/* Details row */}
+                          <div className="px-4 py-2.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-gray-700">{first.therapist.name}</span>
+                              <span className="text-sm text-gray-400">{hLabel(first.startHour)}–{hLabel(first.endHour)}</span>
+                              <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">{FREQ_HE[freq]||freq}</span>
+                              {days.length>0&&<span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">{days.map(d=>DAYS_SHORT[d]).join(' ')}</span>}
+                            </div>
+                            {first.note&&(
+                              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1.5 flex items-start gap-1">
+                                <span className="shrink-0">📝</span>{first.note}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
