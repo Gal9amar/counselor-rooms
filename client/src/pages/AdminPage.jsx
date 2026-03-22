@@ -213,20 +213,26 @@ export default function AdminPage(){
       oneTimeSlots.push(s);
     }
   });
-  // Group ALL slots by room then date (including recurring)
+  // Group one-time slots by room then date
   const slotsByRoom={};
-  const allOneTime=[...oneTimeSlots];
-  // Add recurring slots to the room grouping too
-  Object.values(recurringMap).forEach(series=>series.forEach(s=>allOneTime.push(s)));
-  allOneTime.forEach(s=>{
+  oneTimeSlots.forEach(s=>{
     const rId=s.roomId;
     if(!slotsByRoom[rId])slotsByRoom[rId]={};
     const ds=toDateStr(new Date(s.date));
     if(!slotsByRoom[rId][ds])slotsByRoom[rId][ds]=[];
     slotsByRoom[rId][ds].push(s);
   });
-  // Sort rooms numerically by name
-  const sortedRoomIds=Object.keys(slotsByRoom).sort((a,b)=>{
+  // Group recurring series by room
+  const recurringByRoom={};
+  Object.entries(recurringMap).forEach(([rid,series])=>{
+    const rId=series[0]?.roomId;
+    if(!rId)return;
+    if(!recurringByRoom[rId])recurringByRoom[rId]=[];
+    recurringByRoom[rId].push({rid,series});
+  });
+  // Sort rooms numerically by name (include rooms with only recurring)
+  const allRoomIds=[...new Set([...Object.keys(slotsByRoom),...Object.keys(recurringByRoom)])];
+  const sortedRoomIds=allRoomIds.sort((a,b)=>{
     const ra=rooms.find(r=>r.id===parseInt(a));
     const rb=rooms.find(r=>r.id===parseInt(b));
     const na=parseInt((ra?.name||'').replace(/[^0-9]/g,''))||0;
@@ -382,6 +388,31 @@ export default function AdminPage(){
                     <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-800">
                       <span className="font-bold text-white text-sm">{room?.name||'חדר לא ידוע'}</span>
                     </div>
+                    {/* Recurring series for this room */}
+                    {(recurringByRoom[rId]||[]).map(({rid,series})=>{
+                      const first=series[0];
+                      const sorted=[...series].sort((a,b)=>new Date(a.date)-new Date(b.date));
+                      const firstDate=toDateStr(new Date(sorted[0].date));
+                      const lastDate=toDateStr(new Date(sorted[sorted.length-1].date));
+                      const days=first.recurring?.daysOfWeek||[];
+                      const freq=first.recurring?.frequency;
+                      return(
+                        <div key={rid} className="px-4 py-3 border-b border-gray-100 bg-blue-50 flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <RefreshCw size={13} className="text-blue-500 shrink-0"/>
+                            <span className="text-sm font-semibold text-blue-700">{FREQ_HE[freq]||freq}</span>
+                            {days.length>0&&<span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">{days.map(d=>DAYS_SHORT[d]).join(' ')}</span>}
+                            <span className="text-xs text-gray-500">{hLabel(first.startHour)}–{hLabel(first.endHour)}</span>
+                            <span className="text-xs text-gray-600 font-medium">{first.therapist.name}</span>
+                            <span className="text-xs text-gray-400">{firstDate} → {lastDate}</span>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button onClick={()=>openEditRecurring(rid,series)} className="text-gray-300 hover:text-blue-500 transition-colors p-1"><Pencil size={14}/></button>
+                            <button onClick={()=>handleDeleteRecurring(rid)} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={14}/></button>
+                          </div>
+                        </div>
+                      );
+                    })}
                     {sortedDates.map(ds=>(
                       <div key={ds}>
                         <div className="px-4 py-2 border-b border-gray-100 bg-green-50">
