@@ -278,76 +278,185 @@ function TimelineView({rooms,slots}){
   const nowDecimal=hour+minute/60;
   const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
 
-  const todayRooms=rooms.map(room=>({
-    ...room,
-    daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===dateStr).sort((a,b)=>a.startHour-b.startHour)
-  }));
+  // State: date navigation + room filter
+  const [viewDate,setViewDate]=React.useState(()=>new Date());
+  const [filterRoom,setFilterRoom]=React.useState('all');
+  const [viewMode,setViewMode]=React.useState('day'); // 'day' | 'week'
 
-  // In RTL layout: right:0% = visual right (near room name = hour 8)
-  // right:X% positions element X% from the right edge
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // Week days helper
+  function startOfWeek(d){const c=new Date(d);c.setHours(0,0,0,0);c.setDate(c.getDate()-c.getDay());return c;}
+  function addDays(d,n){const c=new Date(d);c.setDate(c.getDate()+n);return c;}
+
+  const weekStart=startOfWeek(viewDate);
+  const weekDays=viewMode==='week'?Array.from({length:7},(_,i)=>addDays(weekStart,i)):[viewDate];
+
+  function prevNav(){setViewDate(d=>addDays(d,viewMode==='week'?-7:-1));}
+  function nextNav(){setViewDate(d=>addDays(d,viewMode==='week'?7:1));}
+  function goToday(){setViewDate(new Date());}
+
+  // Filter rooms
+  const displayRooms=filterRoom==='all'?rooms:rooms.filter(r=>String(r.id)===filterRoom);
+
+  // pct: right% — right:0% = 8:00 (visual right in RTL)
   const toRight=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
-  const barWidth=(s)=>`${((s.endHour-s.startHour)/totalHours)*100}%`;
 
   return(
     <div className="card rounded-2xl overflow-hidden fade-up">
-      {/* Header */}
+      {/* Controls */}
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-2 items-center justify-between">
+        {/* Date nav */}
+        <div className="flex items-center gap-1">
+          <button onClick={prevNav} className="btn-ghost p-1.5"><ChevronRight size={16}/></button>
+          <button onClick={goToday} className="text-xs text-green-600 font-semibold px-2 py-1 rounded-lg hover:bg-green-50 transition-colors">היום</button>
+          <button onClick={nextNav} className="btn-ghost p-1.5"><ChevronLeft size={16}/></button>
+          <span className="text-sm font-semibold text-gray-700 mr-1">
+            {viewMode==='week'
+              ? `${addDays(weekStart,0).getDate()} ${MONTHS_HE[addDays(weekStart,0).getMonth()]} – ${addDays(weekStart,6).getDate()} ${MONTHS_HE[addDays(weekStart,6).getMonth()]}`
+              : `${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`
+            }
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View mode toggle */}
+          <div className="flex bg-white border border-gray-200 rounded-xl p-0.5 gap-0.5">
+            <button onClick={()=>setViewMode('day')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${viewMode==='day'?'bg-green-500 text-white':'text-gray-400 hover:text-gray-600'}`}>יום</button>
+            <button onClick={()=>setViewMode('week')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${viewMode==='week'?'bg-green-500 text-white':'text-gray-400 hover:text-gray-600'}`}>שבוע</button>
+          </div>
+
+          {/* Room filter */}
+          <select
+            className="input py-1 text-xs w-auto"
+            value={filterRoom}
+            onChange={e=>setFilterRoom(e.target.value)}
+          >
+            <option value="all">כל החדרים</option>
+            {rooms.map(r=><option key={r.id} value={String(r.id)}>{r.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Header: hour axis */}
       <div className="flex border-b border-gray-100 bg-gray-50">
-        {/* Room label — first in RTL = rightmost */}
-        <div className="w-28 shrink-0 px-4 py-2.5 text-xs text-gray-400 font-medium">חדר</div>
-        {/* Hour axis */}
-        <div className="flex-1 relative h-9">
+        <div className="w-20 shrink-0 px-3 py-2 text-xs text-gray-400 font-medium">חדר</div>
+        {viewMode==='week' && <div className="w-16 shrink-0 px-2 py-2 text-xs text-gray-400 font-medium border-r border-gray-100">יום</div>}
+        <div className="flex-1 relative h-8">
           {HOURS.map(h=>(
-            <div key={h} className="absolute top-0 text-xs text-gray-400 translate-x-1/2" style={{right:toRight(h)}}>
-              <div className="h-2 border-l border-gray-200 mx-auto w-px mb-0.5"/>
-              {hLabel(h)}
+            <div key={h} className="absolute top-0 translate-x-1/2 text-xs text-gray-400" style={{right:toRight(h)}}>
+              <div className="h-2 border-r border-gray-200 mx-auto w-px mb-0.5"/>
+              {h}
             </div>
           ))}
         </div>
       </div>
 
       {/* Rows */}
-      {todayRooms.map((room,ri)=>(
-        <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
-          {/* Room name — first in RTL = rightmost */}
-          <div className="w-28 shrink-0 px-4 py-3 text-sm font-medium text-gray-700 truncate">{room.name}</div>
-          {/* Bar area */}
-          <div className="flex-1 relative h-10 my-1">
-            {/* Now line */}
-            {nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
-              <div className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10" style={{right:toRight(nowDecimal)}}/>
-            )}
-            {/* Slots */}
-            {room.daySlots.map(s=>{
-              const isNow=nowDecimal>=s.startHour&&nowDecimal<s.endHour;
-              const isPast=s.endHour<=nowDecimal;
-              return(
-                <div key={s.id}
-                  className={`absolute top-1 bottom-1 rounded-lg flex items-center px-2 text-xs font-medium overflow-hidden ${
-                    isNow?'bg-gradient-to-r from-green-500 to-green-400 text-white shadow-md shadow-green-200'
-                    :isPast?'bg-gray-100 text-gray-400'
-                    :'bg-green-100 text-green-700 border border-green-200'
-                  }`}
-                  style={{right:toRight(s.startHour), width:barWidth(s)}}
-                  title={`${s.therapist.name} ${hLabel(s.startHour)}–${hLabel(s.endHour)}`}>
-                  <span className="truncate">{s.therapist.name}</span>
-                </div>
-              );
-            })}
-            {room.daySlots.length===0&&(
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-dashed border-gray-200"/>
+      {viewMode==='day' ? (
+        // Day view: one row per room
+        displayRooms.map((room,ri)=>{
+          const ds=toDateStr(viewDate);
+          const daySlots=slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===ds).sort((a,b)=>a.startHour-b.startHour);
+          const isToday=ds===dateStr;
+          return(
+            <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
+              <div className="w-20 shrink-0 px-3 py-3 text-xs font-semibold text-gray-700 truncate">{room.name}</div>
+              <div className="flex-1 relative h-12 my-1">
+                {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10 shadow-sm" style={{right:toRight(nowDecimal)}}/>
+                )}
+                {daySlots.map(s=>{
+                  const isNow=nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+                  const isPast=isToday?s.endHour<=nowDecimal:ds<dateStr;
+                  const slotW=((s.endHour-s.startHour)/totalHours)*100;
+                  return(
+                    <div key={s.id}
+                      className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-center px-1.5 ${
+                        isNow?'bg-gradient-to-l from-green-500 to-green-400 text-white shadow-md shadow-green-200'
+                        :isPast?'bg-gray-100 text-gray-400'
+                        :'bg-green-100 text-green-800 border border-green-200'
+                      }`}
+                      style={{right:toRight(s.startHour),width:`${slotW}%`}}
+                      title={`${s.therapist.name} ${s.startHour}:00–${s.endHour}:00${s.note?' | '+s.note:''}`}>
+                      <span className="text-xs font-semibold truncate leading-tight">{s.therapist.name}</span>
+                      {slotW>12&&<span className="text-xs opacity-75 truncate leading-tight">{s.startHour}:00–{s.endHour}:00</span>}
+                      {slotW>20&&s.note&&<span className="text-xs opacity-60 truncate leading-tight italic">{s.note}</span>}
+                    </div>
+                  );
+                })}
+                {daySlots.length===0&&<div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-gray-200"/></div>}
               </div>
-            )}
-          </div>
-        </div>
-      ))}
+            </div>
+          );
+        })
+      ) : (
+        // Week view: one row per room per day that has slots
+        displayRooms.map((room,ri)=>{
+          const roomWeekSlots=weekDays.map(day=>({
+            day,
+            ds:toDateStr(day),
+            daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===toDateStr(day)).sort((a,b)=>a.startHour-b.startHour)
+          })).filter(({daySlots})=>daySlots.length>0);
+
+          if(roomWeekSlots.length===0) return null;
+
+          return(
+            <React.Fragment key={room.id}>
+              {roomWeekSlots.map(({day,ds,daySlots},di)=>{
+                const isToday=ds===dateStr;
+                return(
+                  <div key={ds} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/50'}`}>
+                    {/* Room name — only on first row */}
+                    <div className="w-20 shrink-0 px-3 py-3 text-xs font-semibold text-gray-700 truncate">
+                      {di===0?room.name:''}
+                    </div>
+                    {/* Day label */}
+                    <div className={`w-16 shrink-0 px-2 py-1 text-xs border-r border-gray-100 ${isToday?'text-green-700 font-bold':'text-gray-500'}`}>
+                      <div>{DAYS_HE[day.getDay()].slice(0,3)}</div>
+                      <div className="text-gray-400">{day.getDate()}/{day.getMonth()+1}</div>
+                    </div>
+                    {/* Bar */}
+                    <div className="flex-1 relative h-12 my-1">
+                      {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
+                        <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10" style={{right:toRight(nowDecimal)}}/>
+                      )}
+                      {daySlots.map(s=>{
+                        const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+                        const isPast=(isToday&&s.endHour<=nowDecimal)||(ds<dateStr);
+                        const slotW=((s.endHour-s.startHour)/totalHours)*100;
+                        return(
+                          <div key={s.id}
+                            className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-center px-1.5 ${
+                              isNow?'bg-gradient-to-l from-green-500 to-green-400 text-white shadow-md shadow-green-200'
+                              :isPast?'bg-gray-100 text-gray-400'
+                              :'bg-green-100 text-green-800 border border-green-200'
+                            }`}
+                            style={{right:toRight(s.startHour),width:`${slotW}%`}}
+                            title={`${s.therapist.name} ${s.startHour}:00–${s.endHour}:00${s.note?' | '+s.note:''}`}>
+                            <span className="text-xs font-semibold truncate leading-tight">{s.therapist.name}</span>
+                            {slotW>12&&<span className="text-xs opacity-75 truncate leading-tight">{s.startHour}:00–{s.endHour}:00</span>}
+                            {slotW>20&&s.note&&<span className="text-xs opacity-60 truncate leading-tight italic">{s.note}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          );
+        })
+      )}
 
       {/* Legend */}
-      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400">
+      <div className="flex gap-5 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex-wrap">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block"/> הבא</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 inline-block"/> עבר</span>
-        <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-green-400 inline-block"/> עכשיו</span>
+        <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-red-400 inline-block"/> עכשיו</span>
       </div>
     </div>
   );
