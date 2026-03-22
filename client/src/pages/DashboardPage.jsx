@@ -281,6 +281,7 @@ function TimelineView({rooms,slots}){
   const [viewDate,setViewDate]=React.useState(()=>new Date());
   const [filterRoom,setFilterRoom]=React.useState('all');
   const [viewMode,setViewMode]=React.useState('day');
+  const [expandedSlot,setExpandedSlot]=React.useState(null); // mobile tap to expand
 
   const today=new Date();today.setHours(0,0,0,0);
 
@@ -290,63 +291,45 @@ function TimelineView({rooms,slots}){
   const weekStart=startOfWeek(viewDate);
   const weekDays=viewMode==='week'?Array.from({length:7},(_,i)=>addDays(weekStart,i)):[viewDate];
 
-  function prevNav(){setViewDate(d=>addDays(d,viewMode==='week'?-7:-1));}
-  function nextNav(){setViewDate(d=>addDays(d,viewMode==='week'?7:1));}
-  function goToday(){setViewDate(new Date());}
+  function prevNav(){setViewDate(d=>addDays(d,viewMode==='week'?-7:-1));setExpandedSlot(null);}
+  function nextNav(){setViewDate(d=>addDays(d,viewMode==='week'?7:1));setExpandedSlot(null);}
+  function goToday(){setViewDate(new Date());setExpandedSlot(null);}
 
   const displayRooms=filterRoom==='all'?rooms:rooms.filter(r=>String(r.id)===filterRoom);
   const toRight=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
 
-  // Hour axis row (shared)
-  function HourAxis(){
-    return(
-      <div className="relative h-7 bg-gray-50 border-b border-gray-100">
-        {HOURS.map(h=>(
-          <div key={h} className="absolute top-0 bottom-0 flex flex-col items-center" style={{right:toRight(h)}}>
-            <div className="w-px h-2 bg-gray-300"/>
-            <span className="text-gray-400 mt-0.5" style={{fontSize:'9px',transform:'translateX(50%)'}}>{h}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  // Slot block component — shared between day/week
+  function SlotBlock({s,isNow,isPast,slotW}){
+    const isExpanded=expandedSlot===s.id;
+    const color=isNow?'bg-gradient-to-l from-green-500 to-green-400 text-white shadow-lg shadow-green-200'
+      :isPast?'bg-gray-200 text-gray-500'
+      :'bg-green-100 text-green-900 border border-green-300';
 
-  // Single bar row
-  function BarRow({daySlots,ds,height='h-10'}){
-    const isToday=ds===dateStr;
     return(
-      <div className={`relative ${height} bg-white`}>
-        {/* Grid lines */}
-        {HOURS.map(h=>(
-          <div key={h} className="absolute top-0 bottom-0 w-px bg-gray-100" style={{right:toRight(h)}}/>
-        ))}
-        {/* Now line */}
-        {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
-          <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10" style={{right:toRight(nowDecimal)}}/>
-        )}
-        {/* Slots */}
-        {daySlots.map(s=>{
-          const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
-          const isPast=(isToday&&s.endHour<=nowDecimal)||(ds<dateStr);
-          const slotW=((s.endHour-s.startHour)/totalHours)*100;
-          return(
-            <div key={s.id}
-              className={`absolute top-1 bottom-1 rounded-lg overflow-hidden flex flex-col justify-center px-1.5 ${
-                isNow?'bg-gradient-to-l from-green-500 to-green-400 text-white shadow-md shadow-green-200'
-                :isPast?'bg-gray-100 text-gray-400'
-                :'bg-green-100 text-green-800 border border-green-200'
-              }`}
-              style={{right:toRight(s.startHour),width:`${slotW}%`}}
-              title={`${s.therapist.name} | ${s.room?.name} | ${s.startHour}:00–${s.endHour}:00${s.note?' | '+s.note:''}`}>
-              <span className="text-xs font-semibold truncate leading-tight">{s.therapist.name}</span>
-              {slotW>12&&<span className="text-xs opacity-75 truncate leading-tight">{s.startHour}:00–{s.endHour}:00</span>}
-              {slotW>22&&s.note&&<span className="text-xs opacity-60 truncate leading-tight italic">{s.note}</span>}
-            </div>
-          );
-        })}
-        {daySlots.length===0&&(
-          <div className="absolute inset-0 flex items-center px-2">
-            <div className="w-full border-t border-dashed border-gray-200"/>
+      <div
+        className={`absolute top-1 bottom-1 rounded-xl overflow-visible flex flex-col justify-center cursor-pointer transition-all ${color} ${isExpanded?'z-30':'z-10 hover:z-20'}`}
+        style={{right:toRight(s.startHour),width:`${slotW}%`,minWidth:'4px'}}
+        onClick={e=>{e.stopPropagation();setExpandedSlot(isExpanded?null:s.id);}}
+      >
+        {/* Block content */}
+        <div className="px-1.5 overflow-hidden">
+          {slotW>8&&<span className="block text-xs font-bold truncate leading-tight">{s.therapist.name}</span>}
+          {slotW>14&&<span className={`block text-xs truncate leading-tight ${isNow?'text-white/80':isPast?'text-gray-400':'text-green-700'}`}>{s.room?.name}</span>}
+          {slotW>14&&<span className={`block text-xs truncate leading-tight ${isNow?'text-white/70':isPast?'text-gray-400':'text-green-600'}`}>{s.startHour}:00–{s.endHour}:00</span>}
+        </div>
+        {/* Expanded popup — mobile friendly */}
+        {isExpanded&&(
+          <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 min-w-[180px] max-w-[220px] z-50 text-gray-800" dir="rtl">
+            <p className="font-bold text-sm text-gray-900 mb-1">{s.therapist.name}</p>
+            <p className="text-xs text-gray-500 flex items-center gap-1 mb-0.5">
+              <span>🏠</span>{s.room?.name}
+            </p>
+            <p className="text-xs text-green-700 font-semibold flex items-center gap-1 mb-0.5">
+              <span>🕐</span>{s.startHour}:00 – {s.endHour}:00
+            </p>
+            {s.note&&<p className="text-xs text-gray-500 italic flex items-start gap-1 mt-1 pt-1 border-t border-gray-100">
+              <span className="shrink-0">📝</span>{s.note}
+            </p>}
           </div>
         )}
       </div>
@@ -354,97 +337,124 @@ function TimelineView({rooms,slots}){
   }
 
   return(
-    <div className="card rounded-2xl overflow-hidden fade-up">
+    <div className="card rounded-2xl overflow-visible fade-up" onClick={()=>setExpandedSlot(null)}>
       {/* Controls */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-2 items-center justify-between">
-        <div className="flex items-center gap-1">
-          <button onClick={prevNav} className="btn-ghost p-1.5"><ChevronRight size={16}/></button>
-          <button onClick={goToday} className="text-xs text-green-600 font-semibold px-2 py-1 rounded-lg hover:bg-green-50 transition-colors">היום</button>
-          <button onClick={nextNav} className="btn-ghost p-1.5"><ChevronLeft size={16}/></button>
-          <span className="text-sm font-semibold text-gray-700 mr-1">
+      <div className="px-3 py-2.5 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+        {/* Row 1: date nav */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-0.5">
+            <button onClick={prevNav} className="btn-ghost p-1.5"><ChevronRight size={18}/></button>
+            <button onClick={nextNav} className="btn-ghost p-1.5"><ChevronLeft size={18}/></button>
+            <button onClick={goToday} className="text-xs text-green-600 font-bold px-2 py-1 rounded-lg hover:bg-green-50 transition-colors mr-1">היום</button>
+          </div>
+          <span className="font-bold text-gray-700 text-sm text-center flex-1">
             {viewMode==='week'
-              ?`${addDays(weekStart,0).getDate()} ${MONTHS_HE[addDays(weekStart,0).getMonth()]} – ${addDays(weekStart,6).getDate()} ${MONTHS_HE[addDays(weekStart,6).getMonth()]}`
-              :`${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`
+              ? `${addDays(weekStart,0).getDate()}/${addDays(weekStart,0).getMonth()+1} – ${addDays(weekStart,6).getDate()}/${addDays(weekStart,6).getMonth()+1}`
+              : `${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`
             }
           </span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+          {/* Day/Week toggle */}
           <div className="flex bg-white border border-gray-200 rounded-xl p-0.5 gap-0.5">
-            <button onClick={()=>setViewMode('day')} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${viewMode==='day'?'bg-green-500 text-white':'text-gray-400 hover:text-gray-600'}`}>יום</button>
-            <button onClick={()=>setViewMode('week')} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${viewMode==='week'?'bg-green-500 text-white':'text-gray-400 hover:text-gray-600'}`}>שבוע</button>
+            <button onClick={()=>{setViewMode('day');setExpandedSlot(null);}}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${viewMode==='day'?'bg-green-500 text-white':'text-gray-400'}`}>יום</button>
+            <button onClick={()=>{setViewMode('week');setExpandedSlot(null);}}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${viewMode==='week'?'bg-green-500 text-white':'text-gray-400'}`}>שבוע</button>
           </div>
-          <select className="input py-1 text-xs w-auto" value={filterRoom} onChange={e=>setFilterRoom(e.target.value)}>
-            <option value="all">כל החדרים</option>
-            {rooms.map(r=><option key={r.id} value={String(r.id)}>{r.name}</option>)}
-          </select>
+        </div>
+        {/* Row 2: room filter */}
+        <select
+          className="input py-1.5 text-sm w-full"
+          value={filterRoom}
+          onChange={e=>{setFilterRoom(e.target.value);setExpandedSlot(null);}}
+        >
+          <option value="all">כל החדרים</option>
+          {rooms.map(r=><option key={r.id} value={String(r.id)}>{r.name}</option>)}
+        </select>
+      </div>
+
+      {/* Hour axis header */}
+      <div className="flex border-b border-gray-100 bg-gray-50">
+        <div className={`shrink-0 px-2 py-2 text-xs text-gray-400 font-medium ${viewMode==='week'?'w-16':'w-20'}`}>חדר</div>
+        {viewMode==='week'&&<div className="w-14 shrink-0 px-1 py-2 text-xs text-gray-400 font-medium border-r border-gray-100">יום</div>}
+        <div className="flex-1 relative h-7">
+          {[8,10,12,14,16,18,20].map(h=>(
+            <div key={h} className="absolute top-0 translate-x-1/2 text-xs text-gray-400" style={{right:toRight(h)}}>
+              <div className="h-1.5 border-r border-gray-200 mx-auto w-px mb-0.5"/>
+              <span style={{fontSize:'10px'}}>{h}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Day view: room name as full-width header, bar below */}
-      {viewMode==='day'&&(
-        <div>
-          <HourAxis/>
-          {displayRooms.map((room,ri)=>{
-            const ds=toDateStr(viewDate);
-            const daySlots=slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===ds).sort((a,b)=>a.startHour-b.startHour);
-            return(
-              <div key={room.id} className={`border-b border-gray-50 last:border-0 ${ri%2===0?'':'bg-gray-50/30'}`}>
-                {/* Room name header */}
-                <div className="px-4 py-1.5 border-b border-gray-100 bg-white">
-                  <span className="text-xs font-semibold text-gray-700">{room.name}</span>
-                  {daySlots.length>0&&(
-                    <span className="text-xs text-gray-400 mr-2">{daySlots.length} שיבוצים</span>
-                  )}
-                </div>
-                {/* Bar */}
-                <BarRow daySlots={daySlots} ds={ds}/>
+      {/* Rows */}
+      <div className="overflow-visible">
+      {viewMode==='day'?(
+        displayRooms.map((room,ri)=>{
+          const ds=toDateStr(viewDate);
+          const daySlots=slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===ds).sort((a,b)=>a.startHour-b.startHour);
+          const isToday=ds===dateStr;
+          return(
+            <div key={room.id} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/40'}`}>
+              <div className="w-20 shrink-0 px-2 py-2 text-xs font-bold text-gray-700 truncate">{room.name}</div>
+              <div className="flex-1 relative h-14 my-0.5 overflow-visible">
+                {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-20" style={{right:toRight(nowDecimal)}}/>
+                )}
+                {daySlots.map(s=>{
+                  const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+                  const isPast=(isToday&&s.endHour<=nowDecimal)||(ds<dateStr);
+                  const slotW=((s.endHour-s.startHour)/totalHours)*100;
+                  return <SlotBlock key={s.id} s={s} isNow={isNow} isPast={isPast} slotW={slotW}/>;
+                })}
+                {daySlots.length===0&&<div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-gray-200"/></div>}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Week view: room name header, then one bar per day with slots */}
-      {viewMode==='week'&&(
-        <div>
-          {displayRooms.map((room,ri)=>{
-            const roomWeekSlots=weekDays.map(day=>({
-              day,ds:toDateStr(day),
-              daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===toDateStr(day)).sort((a,b)=>a.startHour-b.startHour)
-            })).filter(({daySlots})=>daySlots.length>0);
-
-            if(roomWeekSlots.length===0) return null;
-            return(
-              <div key={room.id} className={`border-b border-gray-100 last:border-0 ${ri%2===0?'':'bg-gray-50/30'}`}>
-                {/* Room header */}
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                  <span className="text-sm font-bold text-gray-800">{room.name}</span>
-                </div>
-                <HourAxis/>
-                {roomWeekSlots.map(({day,ds,daySlots})=>(
-                  <div key={ds} className="border-b border-gray-50 last:border-0">
-                    {/* Day label */}
-                    <div className="px-4 py-1 border-b border-gray-50">
-                      <span className={`text-xs font-semibold ${ds===dateStr?'text-green-600':'text-gray-500'}`}>
-                        {DAYS_HE[day.getDay()]} {day.getDate()}/{day.getMonth()+1}
-                        {ds===dateStr&&<span className="mr-1.5 text-xs bg-green-100 text-green-700 px-1.5 rounded-full">היום</span>}
-                      </span>
+            </div>
+          );
+        })
+      ):(
+        displayRooms.map((room,ri)=>{
+          const roomWeekSlots=weekDays.map(day=>({
+            day,ds:toDateStr(day),
+            daySlots:slots.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))===toDateStr(day)).sort((a,b)=>a.startHour-b.startHour)
+          })).filter(({daySlots})=>daySlots.length>0);
+          if(roomWeekSlots.length===0)return null;
+          return(
+            <React.Fragment key={room.id}>
+              {roomWeekSlots.map(({day,ds,daySlots},di)=>{
+                const isToday=ds===dateStr;
+                return(
+                  <div key={ds} className={`flex items-center border-b border-gray-50 last:border-0 ${ri%2===0?'bg-white':'bg-gray-50/40'}`}>
+                    <div className="w-16 shrink-0 px-2 py-2 text-xs font-bold text-gray-700 truncate">{di===0?room.name:''}</div>
+                    <div className={`w-14 shrink-0 px-1 py-1 text-center border-r border-gray-100 ${isToday?'text-green-700 font-bold':'text-gray-500'}`} style={{fontSize:'10px'}}>
+                      <div>{DAYS_HE[day.getDay()].slice(0,3)}</div>
+                      <div className="text-gray-400">{day.getDate()}/{day.getMonth()+1}</div>
                     </div>
-                    <BarRow daySlots={daySlots} ds={ds}/>
+                    <div className="flex-1 relative h-14 my-0.5 overflow-visible">
+                      {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
+                        <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-20" style={{right:toRight(nowDecimal)}}/>
+                      )}
+                      {daySlots.map(s=>{
+                        const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+                        const isPast=(isToday&&s.endHour<=nowDecimal)||(ds<dateStr);
+                        const slotW=((s.endHour-s.startHour)/totalHours)*100;
+                        return <SlotBlock key={s.id} s={s} isNow={isNow} isPast={isPast} slotW={slotW}/>;
+                      })}
+                    </div>
                   </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </React.Fragment>
+          );
+        })
       )}
+      </div>
 
       {/* Legend */}
-      <div className="flex gap-4 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block"/> פעיל עכשיו</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block"/> הבא</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 inline-block"/> עבר</span>
-        <span className="flex items-center gap-1.5"><span className="w-0.5 h-3 bg-red-400 inline-block"/> עכשיו</span>
+      <div className="flex gap-4 px-4 py-2.5 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex-wrap rounded-b-2xl">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-lg bg-green-400 inline-block"/> פעיל</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-lg bg-green-100 border border-green-300 inline-block"/> הבא</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-lg bg-gray-200 inline-block"/> עבר</span>
+        <span className="flex items-center gap-1.5 mr-auto text-green-600 font-medium">לחץ על שיבוץ לפרטים</span>
       </div>
     </div>
   );
