@@ -382,8 +382,8 @@ function TimelineView({rooms,slots}){
                       style={{right:toRight(s.startHour),width:`${slotW}%`}}
                       title={`${s.therapist.name} ${s.startHour}:00–${s.endHour}:00${s.note?' | '+s.note:''}`}>
                       <span className="text-xs font-semibold truncate leading-tight">{s.therapist.name}</span>
-                      {slotW>12&&<span className="text-xs opacity-75 truncate leading-tight">{s.startHour}:00–{s.endHour}:00</span>}
-                      {slotW>20&&s.note&&<span className="text-xs opacity-60 truncate leading-tight italic">{s.note}</span>}
+                      {slotW>10&&<span className="text-xs opacity-75 truncate leading-tight">{s.room?.name||''} · {s.startHour}:00–{s.endHour}:00</span>}
+                      {slotW>22&&s.note&&<span className="text-xs opacity-60 truncate leading-tight italic">{s.note}</span>}
                     </div>
                   );
                 })}
