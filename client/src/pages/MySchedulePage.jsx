@@ -203,11 +203,11 @@ export default function MySchedulePage() {
 
                     {/* Timeline bar */}
                     <div className="px-4 pt-3 pb-1">
-                      <div className="relative h-8 rounded-lg bg-gray-100 overflow-hidden" dir="ltr">
+                      <div className="relative h-8 rounded-lg bg-gray-100 overflow-hidden">
                         {/* Hour ticks */}
                         {HOURS.map(h => (
                           <div key={h} className="absolute top-0 bottom-0 w-px bg-gray-200"
-                            style={{left:`${((h-DAY_START)/TOTAL_HOURS)*100}%`}}/>
+                            style={{right:`${((h-DAY_START)/TOTAL_HOURS)*100}%`}}/>
                         ))}
                         {/* Slot blocks */}
                         {daySlots.map((s,i) => {
@@ -220,7 +220,7 @@ export default function MySchedulePage() {
                               className={`absolute top-0.5 bottom-0.5 rounded-md flex items-center justify-center text-xs font-medium text-white overflow-hidden ${
                                 status==='past'?'bg-gray-300':col.bg
                               }`}
-                              style={{left:`${left}%`,width:`${width}%`}}
+                              style={{right:`${left}%`,width:`${width}%`}}
                               title={`${hLabel(s.startHour)}–${hLabel(s.endHour)}`}
                             >
                               {width>20 && <span className="truncate px-1 text-[10px] font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>}
@@ -230,12 +230,12 @@ export default function MySchedulePage() {
                         {/* Now line */}
                         {isToday && currentHour>=DAY_START && currentHour<=DAY_END && (
                           <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10"
-                            style={{left:`${((currentHour-DAY_START)/TOTAL_HOURS)*100}%`}}/>
+                            style={{right:`${((currentHour-DAY_START)/TOTAL_HOURS)*100}%`}}/>
                         )}
                       </div>
                       {/* Hour labels */}
-                      <div className="flex justify-between mt-0.5 px-0.5" dir="ltr">
-                        {[8,10,12,14,16,18,20,22].map(h=>(
+                      <div className="flex justify-between mt-0.5 px-0.5">
+                        {[22,20,18,16,14,12,10,8].map(h=>(
                           <span key={h} className="text-gray-300" style={{fontSize:'9px'}}>{h}</span>
                         ))}
                       </div>
