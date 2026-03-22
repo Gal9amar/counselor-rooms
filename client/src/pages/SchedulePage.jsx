@@ -157,6 +157,12 @@ export default function SchedulePage() {
     Promise.all([getRooms(), getTherapists()]).then(([r, t]) => {
       const sorted = [...r].sort((a, b) => (parseInt(a.name.replace(/\D/g, '')) || 0) - (parseInt(b.name.replace(/\D/g, '')) || 0));
       setRooms(sorted); setTherapists(t); setLoading(false);
+      // Auto-select room if navigated from dashboard
+      const preId = location?.state?.preselectedRoomId;
+      if (preId) {
+        const preRoom = sorted.find(room => room.id === preId);
+        if (preRoom) setTimeout(() => handleSelectRoom(preRoom), 0);
+      }
     });
   }, []);
 
