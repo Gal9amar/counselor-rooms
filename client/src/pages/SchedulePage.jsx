@@ -299,12 +299,43 @@ export default function SchedulePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rooms.map((room, i) => (
               <button key={room.id} onClick={() => handleSelectRoom(room)}
-                className={`card card-clickable rounded-2xl px-5 py-6 text-right fade-up-${Math.min(i, 3)} group`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-800 text-base">{room.name}</span>
-                  <span className="text-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-lg">←</span>
+                className={`card card-clickable rounded-2xl text-right fade-up-${Math.min(i, 3)} overflow-hidden`}>
+                {/* Header */}
+                <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+                  <span className="font-bold text-gray-800 text-base">{room.name}</span>
+                  <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5">לחץ לשיבוץ</p>
+                {/* 6-month stats strip */}
+                {(()=>{
+                  const todayD=new Date();todayD.setHours(0,0,0,0);
+                  const roomSlots=allSlots.filter(s=>s.roomId===room.id);
+                  const months=Array.from({length:6},(_,mi)=>{
+                    const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
+                    const y=d.getFullYear(),m=d.getMonth();
+                    const dim=new Date(y,m+1,0).getDate();
+                    let workDays=0;
+                    for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)workDays++;}
+                    const bookedSet=new Set(roomSlots.filter(s=>{const sd=new Date(s.date);return sd.getFullYear()===y&&sd.getMonth()===m;}).map(s=>new Date(s.date).getDate()));
+                    const booked=bookedSet.size;
+                    const free=workDays-booked;
+                    const pct=workDays>0?Math.round((booked/workDays)*100):0;
+                    return{label:MONTHS_HE[m],booked,free,pct};
+                  });
+                  return(
+                    <div className="flex overflow-x-auto" style={{scrollbarWidth:'none'}}>
+                      {months.map(({label,booked,free,pct},mi)=>(
+                        <div key={mi} className={`shrink-0 px-3 py-2.5 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'70px'}}>
+                          <p className="text-xs font-bold text-gray-600 mb-1.5">{label}</p>
+                          <div className="h-1.5 rounded-full bg-gray-100 mb-1.5 overflow-hidden">
+                            <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
+                          </div>
+                          <p className="text-green-600 font-bold" style={{fontSize:'11px'}}>{booked} משובצים</p>
+                          <p className="text-gray-400" style={{fontSize:'10px'}}>{free} פנויים</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </button>
             ))}
           </div>
