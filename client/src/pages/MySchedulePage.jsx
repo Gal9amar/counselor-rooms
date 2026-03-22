@@ -223,7 +223,16 @@ export default function MySchedulePage() {
                               style={{right:`${left}%`,width:`${width}%`}}
                               title={`${hLabel(s.startHour)}–${hLabel(s.endHour)}`}
                             >
-                              {width>20 && <span className="truncate px-1 text-[10px] font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>}
+                              <span className="px-1 font-medium text-white leading-none" style={{
+                fontSize: width > 20 ? '10px' : width > 10 ? '8px' : '7px',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                maxWidth: '100%',
+                display: 'block',
+                textOverflow: 'ellipsis'
+              }}>
+                {width > 12 ? `${hLabel(s.startHour)}–${hLabel(s.endHour)}` : hLabel(s.startHour)}
+              </span>
                             </div>
                           );
                         })}
