@@ -127,21 +127,26 @@ export default function AdminPage(){
   const [slots,setSlots]=useState([]);
   const _now=new Date();
   const [filterYear,setFilterYear]=useState(_now.getFullYear());
-  const [filterMonth,setFilterMonth]=useState(_now.getMonth()); // 0-indexed
+  const [filterMonths,setFilterMonths]=useState([_now.getMonth()]); // array
   const [newRoom,setNewRoom]=useState('');
   const [newTherapist,setNewTherapist]=useState('');
   const [error,setError]=useState('');
 
-  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonth);}},[authed]);
+  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);}},[authed]);
 
-  const loadAll=async(year,month)=>{
+  const loadAll=async(year,months)=>{
     const y=year??filterYear;
-    const m=month??filterMonth;
-    const from=`${y}-${String(m+1).padStart(2,'0')}-01`;
-    const lastDay=new Date(y,m+1,0).getDate();
-    const to=`${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    const ms=months??filterMonths;
+    const sorted=[...ms].sort((a,b)=>a-b);
+    const firstM=sorted[0];
+    const lastM=sorted[sorted.length-1];
+    const from=`${y}-${String(firstM+1).padStart(2,'0')}-01`;
+    const lastDay=new Date(y,lastM+1,0).getDate();
+    const to=`${y}-${String(lastM+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
     const [r,t,s]=await Promise.all([getRooms(),getTherapists(),getSchedule({from,to})]);
-    setRooms(r);setTherapists(t);setSlots(s);
+    // Filter slots to only selected months
+    const filtered=s.filter(sl=>ms.includes(new Date(sl.date).getMonth()));
+    setRooms(r);setTherapists(t);setSlots(filtered);
   };
 
   const handleLogin=async()=>{try{await verifyAdmin(password);sessionStorage.setItem('adminPass',password);setAdminPassword(password);setAuthed(true);}catch{setAuthError('סיסמה שגויה');}};
@@ -357,26 +362,40 @@ export default function AdminPage(){
 
       {/* Schedule filters — only shown on schedule tab */}
       {tab==='schedule'&&(
-        <div className="flex gap-2 mb-5 flex-wrap items-center">
-          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+        <div className="mb-5 space-y-3">
+          {/* Year selector */}
+          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 w-fit">
             {[filterYear-1,filterYear,filterYear+1].map(y=>(
               <button key={y}
-                onClick={()=>{setFilterYear(y);loadAll(y,filterMonth);}}
+                onClick={()=>{setFilterYear(y);loadAll(y,filterMonths);}}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                   filterYear===y?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'
                 }`}>{y}</button>
             ))}
           </div>
-          <select
-            className="input py-1.5 text-sm w-auto"
-            value={filterMonth}
-            onChange={e=>{const m=parseInt(e.target.value);setFilterMonth(m);loadAll(filterYear,m);}}
-          >
-            {MONTHS_HE.map((m,i)=><option key={i} value={i}>{m}</option>)}
-          </select>
-          <span className="text-xs text-gray-400">
-            {slots.length} שיבוצים ב{MONTHS_HE[filterMonth]} {filterYear}
-          </span>
+          {/* Month pills multi-select */}
+          <div className="flex flex-wrap gap-1.5">
+            {MONTHS_HE.map((name,i)=>{
+              const selected=filterMonths.includes(i);
+              return(
+                <button key={i}
+                  onClick={()=>{
+                    const next=selected
+                      ?filterMonths.filter(m=>m!==i)
+                      :[...filterMonths,i];
+                    if(next.length===0)return; // at least one month
+                    setFilterMonths(next);
+                    loadAll(filterYear,next);
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                    selected
+                      ?'bg-green-500 text-white border-green-500 shadow-sm'
+                      :'bg-white text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-700'
+                  }`}>{name}</button>
+              );
+            })}
+          </div>
+          <span className="text-xs text-gray-400">{slots.length} שיבוצים</span>
         </div>
       )}
 
