@@ -128,6 +128,7 @@ export default function SchedulePage() {
   const [therapists, setTherapists] = useState([]);
   const [allSlots, setAllSlots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
   const [step, setStep] = useState('room');
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
