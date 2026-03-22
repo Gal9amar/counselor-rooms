@@ -296,7 +296,7 @@ export default function SchedulePage() {
         <div className="fade-up">
           <h1 className="section-title mb-1">לוח שיבוצים</h1>
           <p className="text-gray-400 text-sm mb-6">בחר חדר לשיבוץ</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {rooms.map((room, i) => (
               <button key={room.id} onClick={() => handleSelectRoom(room)}
                 className={`card card-clickable rounded-2xl text-right fade-up-${Math.min(i, 3)} overflow-hidden`}>
