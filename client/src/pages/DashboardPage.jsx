@@ -21,10 +21,8 @@ function formatDateHe(dateStr){
   const d=new Date(dateStr+'T00:00:00');
   return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
 }
-return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function hLabel(h){return `${h}:00`;}
 function getNow(){const n=new Date();return{dateStr:toDateStr(n),hour:n.getHours(),minute:n.getMinutes()};}
-function formatDateHe(ds){const d=new Date(ds+'T00:00:00');return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;}
 
 function RoomModal({room,onClose}){
   const today=new Date();today.setHours(0,0,0,0);
