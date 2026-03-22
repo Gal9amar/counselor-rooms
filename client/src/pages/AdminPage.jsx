@@ -97,9 +97,15 @@ function SlotRow({slot,therapists,rooms,onSave,onDelete}){
       ):(
         <div className="flex items-center justify-between">
           <div>
-            <span className="font-medium text-gray-700">{slot.therapist.name}</span>
-            <span className="text-sm text-gray-400 mr-3">{slot.room.name} · {formatDateHe(toDateStr(new Date(slot.date)))} · {hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
-            {slot.note&&<span className="text-xs text-gray-400 mr-2 italic">· {slot.note}</span>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-gray-700">{slot.therapist.name}</span>
+              <span className="text-sm text-gray-400">{hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
+            </div>
+            {slot.note && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-start gap-1">
+                <span className="shrink-0">📝</span>{slot.note}
+              </p>
+            )}
           </div>
           <div className="flex gap-1">
             <button onClick={()=>setEditing(true)} className="text-gray-300 hover:text-green-500 p-1 transition-colors"><Pencil size={14}/></button>
