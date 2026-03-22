@@ -153,7 +153,13 @@ function RoomCard({room,slots,onClick,index}){
   // All slots on the same day as "next" (the upcoming day)
   const nextDayStr=next?toDateStr(new Date(next.date)):null;
   const nextDaySlots=nextDayStr
-    ?roomSlots.filter(s=>toDateStr(new Date(s.date))===nextDayStr&&s.endHour>nowDecimal)
+    ?roomSlots.filter(s=>{
+        if(toDateStr(new Date(s.date))!==nextDayStr) return false;
+        // If next day is today — only show slots not yet ended
+        if(nextDayStr===dateStr) return s.endHour>nowDecimal;
+        // Future day — show all slots
+        return true;
+      })
     :[];
 
   const isActive=!!active;
