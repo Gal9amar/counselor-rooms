@@ -313,40 +313,35 @@ export default function SchedulePage() {
                   <span className="font-bold text-gray-800 text-lg">{room.name}</span>
                   <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
                 </div>
-                {/* 6-month stats strip */}
+                {/* Stats */}
                 {(()=>{
-                  const todayD=new Date();todayD.setHours(0,0,0,0);
-                  const roomSlots=allSlots.filter(s=>s.roomId===room.id);
+                  const _now2=new Date();
+                  const rs=allSlots.filter(s=>s.roomId===room.id);
                   const months=Array.from({length:3},(_,mi)=>{
-                    const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
-                    const y=d.getFullYear(),m=d.getMonth();
+                    const base=new Date(_now2.getFullYear(),_now2.getMonth()+mi,1);
+                    const y=base.getFullYear(),m=base.getMonth();
                     const dim=new Date(y,m+1,0).getDate();
-                    // Use toDateStr to avoid timezone issues
-                    const pad=(n)=>String(n).padStart(2,'0');
-                    let bookedDays=0,freeDays=0;
-                    for(let dd=1;dd<=dim;dd++){
-                      const dow=new Date(y,m,dd).getDay();
-                      if(dow===6)continue;
-                      const dsKey=`${y}-${pad(m+1)}-${pad(dd)}`;
-                      const daySlots=roomSlots.filter(s=>toDateStr(new Date(s.date))===dsKey);
-                      const bookedHours=daySlots.reduce((acc,s)=>acc+(s.endHour-s.startHour),0);
-                      if(bookedHours>=13){bookedDays++;}
-                      else{freeDays++;}
-                    }
-                    const workDays=bookedDays+freeDays;
-                    const pct=workDays>0?Math.round((bookedDays/workDays)*100):0;
-                    return{label:MONTHS_HE[m],booked:bookedDays,free:freeDays,pct};
+                    let work=0;
+                    for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)work++;}
+                    const bs=new Set();
+                    rs.forEach(s=>{
+                      const p=s.date.slice(0,10); // '2026-03-24'
+                      const sy=parseInt(p.slice(0,4)),sm=parseInt(p.slice(5,7))-1,sd=parseInt(p.slice(8,10));
+                      if(sy===y&&sm===m) bs.add(sd);
+                    });
+                    const booked=bs.size, free=Math.max(0,work-booked);
+                    return{label:MONTHS_HE[m],booked,free,work,pct:work>0?Math.round((booked/work)*100):0};
                   });
                   return(
-                    <div className="flex overflow-x-auto" style={{scrollbarWidth:'none'}}>
+                    <div className='flex border-t border-gray-100'>
                       {months.map(({label,booked,free,pct},mi)=>(
-                        <div key={mi} className={`shrink-0 px-4 py-3 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'80px'}}>
-                          <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
-                          <div className="h-2 rounded-full bg-gray-100 mb-2 overflow-hidden">
-                            <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
+                        <div key={mi} className='flex-1 px-2 py-3 text-center border-r border-gray-100 last:border-0'>
+                          <p className='text-xs font-bold text-gray-500 mb-1.5'>{label}</p>
+                          <div className='h-1.5 rounded-full bg-gray-100 mb-2 overflow-hidden mx-1'>
+                            <div className='h-full rounded-full bg-green-400' style={{width:`${pct}%`}}/>
                           </div>
-                          <p className="text-green-600 font-bold" style={{fontSize:'12px'}}>{booked} משובצים</p>
-                          <p className="text-gray-400" style={{fontSize:'11px'}}>{free} פנויים</p>
+                          <p className='text-sm font-bold text-green-600'>{booked} <span className='text-xs font-normal text-gray-400'>משובצים</span></p>
+                          <p className='text-sm font-semibold text-gray-400'>{free} <span className='text-xs font-normal text-gray-300'>פנויים</span></p>
                         </div>
                       ))}
                     </div>
