@@ -381,7 +381,7 @@ function TimelineView({rooms,slots}){
         <div className="w-24 shrink-0 px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide">חדר</div>
         {viewMode==='week'&&<div className="w-16 shrink-0 border-r border-gray-200"/>}
         <div className="flex-1 relative h-8">
-          {[8,10,12,14,16,18,20,22].map(h=>(
+          {[8,10,12,14,16,18,20].map(h=>(
             <div key={h} className="absolute top-0 translate-x-1/2" style={{right:toRight(h)}}>
               <div className="h-2 border-r border-gray-300 mx-auto w-px mb-0.5"/>
               <span className="text-xs text-gray-400 font-medium">{h}</span>
