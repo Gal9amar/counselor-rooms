@@ -1,7 +1,21 @@
 import axios from 'axios';
 
+// Global loading counter (works without React context in axios layer)
+let _loadingCount = 0;
+function setGlobalLoading(val) {
+  _loadingCount += val ? 1 : -1;
+  // Dispatch custom event that App.jsx listens to
+  window.dispatchEvent(new CustomEvent('apiLoading', { detail: { active: _loadingCount > 0 } }));
+}
+
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const api = axios.create({ baseURL: BASE_URL });
+
+api.interceptors.request.use(cfg => { setGlobalLoading(true); return cfg; });
+api.interceptors.response.use(
+  res => { setGlobalLoading(false); return res; },
+  err => { setGlobalLoading(false); return Promise.reject(err); }
+);
 
 export const setAdminPassword = (password) => {
   api.defaults.headers.common['x-admin-password'] = password;
