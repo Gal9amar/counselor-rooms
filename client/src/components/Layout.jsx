@@ -32,7 +32,7 @@ export default function Layout() {
 
       {/* Desktop top nav */}
       <nav className="hidden sm:block bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo right — חוף אשקלון */}
             <img src="/logo-left.png" alt="חוף אשקלון" className="h-10 w-auto object-contain cursor-pointer" onClick={() => navigate('/')} />
@@ -100,7 +100,7 @@ export default function Layout() {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6">
         <Outlet />
       </main>
 
