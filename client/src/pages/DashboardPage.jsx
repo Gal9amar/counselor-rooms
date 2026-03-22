@@ -17,6 +17,7 @@ function RoomModal({room,onClose}){
   const [month,setMonth]=useState(today.getMonth());
   const [slots,setSlots]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [selectedDate,setSelectedDate]=useState(null); // clicked day
 
   const load=useCallback(async(y,m)=>{
     setLoading(true);
@@ -27,7 +28,7 @@ function RoomModal({room,onClose}){
     finally{setLoading(false);}
   },[room.id]);
 
-  useEffect(()=>{load(year,month);},[year,month,load]);
+  useEffect(()=>{load(year,month);setSelectedDate(null);},[year,month,load]);
 
   const prevMonth=()=>{if(month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1);};
   const nextMonth=()=>{if(month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1);};
@@ -41,71 +42,110 @@ function RoomModal({room,onClose}){
   for(let d=1;d<=daysInMonth;d++)cells.push(d);
   const isPrevDisabled=year===today.getFullYear()&&month===today.getMonth();
 
+  // Slots for selected day
+  const selectedSlots=selectedDate?((slotsByDate[selectedDate]||[]).sort((a,b)=>a.startHour-b.startHour)):[];
+
   return(
     <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col scale-in border border-gray-100" onClick={e=>e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-800">{room.name}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">לוח שיבוצים חודשי</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {selectedDate ? formatDateHe(selectedDate) : 'לחץ על יום לפרטים'}
+            </p>
           </div>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={20}/></button>
         </div>
+        {/* Month nav */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <button onClick={prevMonth} disabled={isPrevDisabled} className="btn-ghost p-1.5 disabled:opacity-30"><ChevronRight size={18}/></button>
           <span className="font-semibold text-gray-700">{MONTHS_HE[month]} {year}</span>
           <button onClick={nextMonth} className="btn-ghost p-1.5"><ChevronLeft size={18}/></button>
         </div>
+
         <div className="overflow-y-auto flex-1 px-5 py-4">
           {loading ? <div className="text-center text-gray-400 py-10">טוען...</div> : (
             <>
+              {/* Calendar */}
               <div className="grid grid-cols-7 mb-1">
                 {DAYS_HE.map(d=><div key={d} className="text-center text-xs text-gray-400 font-medium py-1">{d.slice(0,1)}</div>)}
               </div>
-              <div className="grid grid-cols-7 gap-1 mb-5">
+              <div className="grid grid-cols-7 gap-1 mb-4">
                 {cells.map((day,i)=>{
                   if(!day)return<div key={`p-${i}`}/>;
                   const d=new Date(year,month,day);
                   const ds=toDateStr(d);
                   const isPast=d<today;
                   const isToday=ds===toDateStr(today);
+                  const isSelected=ds===selectedDate;
                   const hasSlot=!!(slotsByDate[ds]?.length);
+                  const count=slotsByDate[ds]?.length||0;
                   return(
-                    <div key={ds} className={`rounded-xl py-1.5 text-sm text-center flex flex-col items-center gap-0.5 ${
-                      isToday?'bg-green-100 font-bold text-green-700 ring-1 ring-green-300'
-                      :isPast?'text-gray-200'
-                      :hasSlot?'bg-green-50 text-green-700 font-medium'
-                      :'text-gray-500'}`}>
+                    <button
+                      key={ds}
+                      onClick={()=>setSelectedDate(isSelected?null:ds)}
+                      className={`rounded-xl py-1.5 text-sm text-center flex flex-col items-center gap-0.5 transition-all ${
+                        isSelected?'bg-green-500 text-white ring-2 ring-green-400 shadow-md'
+                        :isToday?'bg-green-100 font-bold text-green-700 ring-1 ring-green-300 hover:bg-green-200'
+                        :isPast?'text-gray-200 cursor-default'
+                        :hasSlot?'bg-green-50 text-green-700 font-medium hover:bg-green-100 cursor-pointer'
+                        :'text-gray-400 hover:bg-gray-50 cursor-pointer'
+                      }`}
+                    >
                       {day}
-                      {hasSlot&&!isPast&&<span className={`w-1.5 h-1.5 rounded-full ${isToday?'bg-green-500':'bg-green-400'}`}/>}
-                    </div>
+                      {hasSlot&&(
+                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected?'bg-white':'bg-green-400'}`}/>
+                      )}
+                    </button>
                   );
                 })}
               </div>
-              {Object.keys(slotsByDate).length===0?(
-                <p className="text-center text-gray-400 text-sm py-4">אין שיבוצים בחודש זה</p>
-              ):(
-                <div className="space-y-3">
-                  {Object.keys(slotsByDate).sort().map(ds=>{
-                    const d=new Date(ds+'T00:00:00');
-                    const isPast=d<today;
-                    return(
-                      <div key={ds}>
-                        <div className={`text-xs font-semibold mb-1.5 ${isPast?'text-gray-300':'text-gray-500'}`}>{formatDateHe(ds)}</div>
-                        <div className="space-y-1">
-                          {slotsByDate[ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
-                            <div key={s.id} className={`flex items-center justify-between rounded-xl px-3 py-2 ${isPast?'bg-gray-50 border border-gray-100':'bg-green-50 border border-green-100'}`}>
-                              <div className="flex items-center gap-2">
-                                <User size={13} className={isPast?'text-gray-300':'text-green-500'}/>
-                                <span className={`text-sm font-medium ${isPast?'text-gray-400':'text-gray-700'}`}>{s.therapist.name}</span>
-                              </div>
-                              <span className={`text-xs font-medium ${isPast?'text-gray-300':'text-green-600'}`}>{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
+
+              {/* Selected day slots */}
+              {selectedDate&&(
+                <div className="border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-green-500"/>
+                      {formatDateHe(selectedDate)}
+                    </h3>
+                    {selectedSlots.length>0&&(
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                        {selectedSlots.length} שיבוצים
+                      </span>
+                    )}
+                  </div>
+                  {selectedSlots.length===0?(
+                    <p className="text-gray-400 text-sm text-center py-3">אין שיבוצים ביום זה</p>
+                  ):(
+                    <div className="space-y-2">
+                      {selectedSlots.map(s=>(
+                        <div key={s.id} className="bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <User size={13} className="text-green-500"/>
+                              <span className="text-sm font-semibold text-gray-800">{s.therapist.name}</span>
                             </div>
-                          ))}
+                            <span className="text-sm font-medium text-green-700">
+                              {hLabel(s.startHour)} – {hLabel(s.endHour)}
+                            </span>
+                          </div>
+                          {s.note&&<p className="text-xs text-gray-400 italic mt-1.5 pr-5">{s.note}</p>}
                         </div>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No day selected — show summary */}
+              {!selectedDate&&(
+                <div className="text-center text-gray-400 text-xs py-2">
+                  {Object.keys(slotsByDate).length===0
+                    ?'אין שיבוצים בחודש זה'
+                    :`${Object.keys(slotsByDate).length} ימים עם שיבוצים — לחץ על יום לפרטים`}
                 </div>
               )}
             </>
@@ -116,14 +156,6 @@ function RoomModal({room,onClose}){
   );
 }
 
-function formatNextDate(dateStr){
-  const today=toDateStr(new Date());
-  if(dateStr===today) return 'היום';
-  const d=new Date(dateStr+'T00:00:00');
-  const diff=Math.round((d-new Date(today+'T00:00:00'))/(1000*60*60*24));
-  if(diff===1) return 'מחר';
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
-}
 
 function RoomCard({room,slots,onClick,index}){
   const {dateStr,hour,minute}=getNow();
