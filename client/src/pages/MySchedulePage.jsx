@@ -112,7 +112,7 @@ export default function MySchedulePage() {
           <User size={17} className="text-green-500"/>
         </div>
         <select
-          className="input pr-10 pl-8 text-base font-medium appearance-none cursor-pointer"
+          className="input pr-10 pl-8 text-base font-medium appearance-none cursor-pointer" style={{paddingRight:'2.5rem'}}
           value={selectedId}
           onChange={e => setSelectedId(e.target.value)}
         >
@@ -203,7 +203,7 @@ export default function MySchedulePage() {
 
                     {/* Timeline bar */}
                     <div className="px-4 pt-3 pb-1">
-                      <div className="relative h-8 rounded-lg bg-gray-100 overflow-hidden">
+                      <div className="relative h-8 rounded-lg bg-gray-100 overflow-hidden" dir="ltr">
                         {/* Hour ticks */}
                         {HOURS.map(h => (
                           <div key={h} className="absolute top-0 bottom-0 w-px bg-gray-200"
@@ -234,7 +234,7 @@ export default function MySchedulePage() {
                         )}
                       </div>
                       {/* Hour labels */}
-                      <div className="flex justify-between mt-0.5 px-0.5">
+                      <div className="flex justify-between mt-0.5 px-0.5" dir="ltr">
                         {[8,10,12,14,16,18,20,22].map(h=>(
                           <span key={h} className="text-gray-300" style={{fontSize:'9px'}}>{h}</span>
                         ))}
