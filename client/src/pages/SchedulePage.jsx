@@ -193,6 +193,8 @@ export default function SchedulePage() {
     const end = parseInt(endHour);
     if (!end || end <= startHour) { setBookError('שעת סיום לא תקינה'); return; }
     if (!selectedTherapist) { setBookError('בחר שם'); return; }
+    const _tName = therapists.find(t => t.id === parseInt(selectedTherapist))?.name || '';
+    if (_tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף רווחה יש למלא הערה'); return; }
     if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים חופף'); return; }
 
     setBooking(true); setBookError('');
