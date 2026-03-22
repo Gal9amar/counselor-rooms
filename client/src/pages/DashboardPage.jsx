@@ -332,7 +332,8 @@ function TimelineView({rooms,slots}){
         </div>
         {/* Popup */}
         {isExpanded&&(
-          <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 w-56 z-50" dir="rtl">
+          <div className="absolute right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 w-56 z-50"
+            style={{bottom:'calc(100% + 8px)'}} dir="rtl">
             <div className={`text-xs font-bold px-2 py-1 rounded-lg mb-3 ${col.header} ${col.label}`}>{s.room?.name}</div>
             <p className="font-bold text-gray-900 mb-2">{s.therapist.name}</p>
             <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00 – {s.endHour}:00</p>
