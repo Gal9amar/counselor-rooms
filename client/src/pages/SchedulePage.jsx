@@ -316,294 +316,41 @@ export default function SchedulePage() {
                 {/* Month stats */}
                 {(()=>{
                   const now=new Date();
-                  const y=now.getFullYear(),m=now.getMonth();
-                  const dim=new Date(y,m+1,0).getDate();
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
-                  // Count unique days with slots this month using date string
-                  console.log('room',room.id,'allSlots',allSlots.length,'roomSlots',roomSlots.length, roomSlots.slice(0,2).map(s=>s.date));
-                  const bookedDateSet=new Set();
-                  roomSlots.forEach(s=>{
-                    const sd=new Date(s.date);
-                    if(sd.getUTCFullYear()===y&&sd.getUTCMonth()===m){
-                      bookedDateSet.add(sd.getUTCDate());
-                    }
+                  const months=Array.from({length:3},(_,mi)=>{
+                    const y=mi===0?now.getFullYear():new Date(now.getFullYear(),now.getMonth()+mi,1).getFullYear();
+                    const m=new Date(now.getFullYear(),now.getMonth()+mi,1).getMonth();
+                    const dim=new Date(y,m+1,0).getDate();
+                    let workDays=0;
+                    for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)workDays++;}
+                    // Use UTC month/year from date string
+                    const bookedSet=new Set();
+                    roomSlots.forEach(s=>{
+                      const utcY=parseInt(s.date.slice(0,4));
+                      const utcM=parseInt(s.date.slice(5,7))-1;
+                      const utcD=parseInt(s.date.slice(8,10));
+                      if(utcY===y&&utcM===m) bookedSet.add(utcD);
+                    });
+                    const booked=bookedSet.size;
+                    const free=Math.max(0,workDays-booked);
+                    const pct=workDays>0?Math.round((booked/workDays)*100):0;
+                    return{label:MONTHS_HE[m],booked,free,workDays,pct};
                   });
-                  // Work days (no Saturday)
-                  let workDays=0;
-                  for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)workDays++;}
-                  const booked=bookedDateSet.size;
-                  const free=workDays-booked;
-                  const pct=workDays>0?Math.round((booked/workDays)*100):0;
                   return(
-                    <div className="px-5 pb-4 pt-3">
-                      <p className="text-xs text-gray-400 font-medium mb-2">{MONTHS_HE[m]} {y}</p>
-                      <div className="h-2 rounded-full bg-gray-100 mb-3 overflow-hidden">
-                        <div className="h-full rounded-full bg-green-400 transition-all" style={{width:`${pct}%`}}/>
-                      </div>
-                      <div className="flex justify-between">
-                        <div className="text-center">
-                          <p className="text-lg font-bold text-green-600">{booked}</p>
-                          <p className="text-xs text-gray-400">ימים משובצים</p>
+                    <div className="flex border-t border-gray-100">
+                      {months.map(({label,booked,free,workDays,pct},mi)=>(
+                        <div key={mi} className="flex-1 px-3 py-3 text-center border-r border-gray-100 last:border-0">
+                          <p className="text-xs font-bold text-gray-500 mb-2">{label}</p>
+                          <div className="h-1.5 rounded-full bg-gray-100 mb-2.5 overflow-hidden mx-1">
+                            <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
+                          </div>
+                          <p className="font-bold text-green-600 text-base leading-tight">{booked}</p>
+                          <p className="text-gray-400 leading-tight" style={{fontSize:'10px'}}>משובצים</p>
+                          <p className="font-semibold text-gray-400 text-sm mt-1 leading-tight">{free}</p>
+                          <p className="text-gray-300 leading-tight" style={{fontSize:'10px'}}>פנויים</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-lg font-bold text-gray-400">{free}</p>
-                          <p className="text-xs text-gray-400">ימים פנויים</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-lg font-bold text-gray-600">{workDays}</p>
-                          <p className="text-xs text-gray-400">סה"כ ימי עבודה</p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   );
                 })()}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {step === 'date' && (
-        <div className="fade-up">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-            <div>
-              <h1 className="section-title">{selectedRoom.name}</h1>
-              <p className="text-gray-400 text-sm">בחר תאריך לשיבוץ</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0 inline-block"/>
-              <span className="text-sm font-semibold text-gray-700">נקודה ירוקה = יש שיבוצים באותו יום</span>
-            </div>
-          </div>
-            <button onClick={handleAddYear} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-2 whitespace-nowrap">
-              <Plus size={15} /> הוסף שנה ({Math.max(...years) + 1})
-            </button>
-          </div>
-          <div className="flex gap-2 mb-5 flex-wrap">
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
-              {years.map(y => (
-                <button key={y} onClick={() => { setFilterYear(y); setFilterMonth(null); }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filterYear === y ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>{y}</button>
-              ))}
-            </div>
-            <select className="input rounded-xl px-3 py-1.5 text-sm w-auto" value={filterMonth ?? ''}
-              onChange={e => setFilterMonth(e.target.value === '' ? null : parseInt(e.target.value))}>
-              <option value="">כל החודשים</option>
-              {MONTHS_HE.map((m, i) => <option key={i} value={i}>{m}</option>)}
-            </select>
-          </div>
-          <div className={`grid gap-4 ${filterMonth !== null ? 'grid-cols-1 max-w-sm' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-            {monthsToShow.map(month => {
-              const lastDay = new Date(filterYear, month + 1, 0);
-              if (lastDay < today) return null;
-              return (
-                <div key={month} className="card rounded-2xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">{MONTHS_HE[month]} {filterYear}</h3>
-                  <MonthCalendar year={filterYear} month={month} onSelectDate={handleSelectDate} slotDates={slotDates} selectedDate={selectedDate} />
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-      )}
-
-      {step === 'hour' && (
-        <div className="fade-up">
-          <h1 className="section-title mb-1">{selectedRoom.name}</h1>
-          <p className="text-green-600 font-medium text-sm mb-5">{formatDateHe(selectedDate)}</p>
-          <p className="text-gray-500 text-sm mb-3">בחר שעת התחלה</p>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-6">
-            {ALL_HOURS.map(h => {
-              const occupied = occupiedHours.has(h);
-              const isSelected = startHour === h;
-              const occupant = daySlots.find(s => h >= s.startHour && h < s.endHour);
-              return (
-                <button key={h} disabled={occupied} type="button"
-                  onClick={() => { if (occupied) return; setStartHour(h); setEndHour(''); setBookError(''); }}
-                  title={occupied ? occupant?.therapist?.name : ''}
-                  className={`hour-btn rounded-xl py-3 text-sm font-medium border ${
-                    isSelected ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-200'
-                    : occupied ? 'bg-gray-100 text-gray-300 border-gray-100 cursor-not-allowed'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700 hover:bg-green-50'
-                  }`}>
-                  {hLabel(h)}
-                  {occupied && <div className="text-xs truncate px-1 text-gray-300 mt-0.5">{occupant?.therapist?.name?.split(' ')[0]}</div>}
-                </button>
-              );
-            })}
-          </div>
-
-          {startHour !== null && (
-            <div className="card rounded-2xl p-5 space-y-4 fade-up border-green-200">
-              <p className="font-semibold text-gray-700">שיבוץ החל מ-<span className="text-green-600">{hLabel(startHour)}</span></p>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת סיום</label>
-                  <select className="input" value={endHour} onChange={e => setEndHour(e.target.value)}>
-                    <option value="">-- בחר --</option>
-                    {ALL_HOURS.filter(h => h > startHour).map(h => {
-                      const blocked = Array.from({ length: h - startHour }, (_, i) => startHour + i).some(x => occupiedHours.has(x));
-                      return <option key={h} value={h} disabled={blocked}>{hLabel(h)}{blocked ? ' (חסום)' : ''}</option>;
-                    })}
-                    {!occupiedHours.has(21) && startHour <= 21 && <option value={22}>22:00</option>}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך</label>
-                  <select className="input" value={selectedTherapist} onChange={e => setSelectedTherapist(e.target.value)}>
-                    <option value="">-- בחר --</option>
-                    {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                {(() => {
-                  const _isAgaf = therapists.find(t => String(t.id) === String(selectedTherapist))?.name === 'אגף רווחה';
-                  return (
-                    <>
-                      <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                        הערה{' '}
-                        {_isAgaf
-                          ? <span className="text-red-500 text-xs font-semibold">* חובה</span>
-                          : <span className="text-gray-400 font-normal text-xs">(לא חובה)</span>}
-                      </label>
-                      <textarea
-                        className={`input resize-none${_isAgaf && !note.trim() ? ' border-red-300' : ''}`}
-                        rows={2}
-                        placeholder={_isAgaf ? 'נא פרט את מטרת השימוש בחדר...' : 'לדוגמה: טיפול זוגי, יש להכין מצע...'}
-                        value={note}
-                        onChange={e => setNote(e.target.value)}
-                        maxLength={200}
-                      />
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Recurring toggle */}
-              <div className="border-t border-gray-100 pt-4">
-                <button type="button"
-                  onClick={() => setIsRecurring(p => !p)}
-                  className={`flex items-center gap-2 text-sm font-medium transition-colors ${isRecurring ? 'text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                  <Repeat2 size={16} />
-                  שיבוץ חוזר
-                  <span className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${isRecurring ? 'bg-green-500' : 'bg-gray-200'}`}>
-                    <span className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${isRecurring ? '-translate-x-4' : 'translate-x-0'}`} />
-                  </span>
-                </button>
-
-                {isRecurring && (
-                  <div className="mt-4 space-y-4 fade-up">
-                    {/* Frequency */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">תדירות</label>
-                      <div className="flex gap-2 flex-wrap mb-1.5">
-                        {FREQ_OPTIONS.map(f => (
-                          <button key={f.value} type="button"
-                            onClick={() => setRecurFrequency(f.value)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                              recurFrequency === f.value
-                                ? 'bg-green-500 text-white border-green-500'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-green-300'
-                            }`}>
-                            {f.label}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.desc}</p>
-                    </div>
-
-                    {/* Days of week (weekly only) */}
-                    {recurFrequency === 'weekly' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-2">ימים בשבוע</label>
-                        <div className="flex gap-2">
-                          {/* Sun=0 Mon=1 ... Fri=5 — show א-ו (0-5) */}
-                          {[0, 1, 2, 3, 4, 5].map(day => (
-                            <button key={day} type="button"
-                              onClick={() => toggleRecurDay(day)}
-                              className={`w-9 h-9 rounded-full text-sm font-bold border transition-all ${
-                                recurDays.includes(day)
-                                  ? 'bg-green-500 text-white border-green-500'
-                                  : 'bg-white text-gray-500 border-gray-200 hover:border-green-300'
-                              }`}>
-                              {DAYS_SHORT[day]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* End condition */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">סיום הסדרה</label>
-                      <div className="flex gap-3 mb-3">
-                        {['occurrences', 'date'].map(mode => (
-                          <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
-                            <input type="radio" name="endMode" value={mode} checked={recurEndMode === mode}
-                              onChange={() => setRecurEndMode(mode)}
-                              className="accent-green-500" />
-                            {mode === 'occurrences' ? 'לפי מספר מופעים' : 'לפי תאריך סיום'}
-                          </label>
-                        ))}
-                      </div>
-                      {recurEndMode === 'occurrences' ? (
-                        <div className="flex items-center gap-2">
-                          <input type="number" min={1} max={200} value={recurOccurrences}
-                            onChange={e => setRecurOccurrences(e.target.value)}
-                            className="input text-center" style={{width:'5rem'}} />
-                          <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
-                        </div>
-                      ) : (
-                        <input type="date" value={recurEndDate} min={selectedDate}
-                          onChange={e => setRecurEndDate(e.target.value)}
-                          className="input w-auto" />
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {bookError && <p className="text-red-500 text-sm">{bookError}</p>}
-              <div className="flex gap-2">
-                <button onClick={handleBook} disabled={!endHour || !selectedTherapist || booking}
-                  className="btn-primary flex-1 py-2.5 px-4">
-                  {booking ? 'שומר...' : isRecurring
-                    ? `שמור סדרה חוזרת ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`
-                    : `אשר שיבוץ ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`}
-                </button>
-                <button type="button" onClick={() => { setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false); }} className="btn-secondary px-4 py-2.5">ביטול</button>
-              </div>
-            </div>
-          )}
-
-          {daySlots.length > 0 && (
-            <div className="mt-6 fade-up">
-              <h3 className="text-sm font-semibold text-gray-500 mb-2">שיבוצים ביום זה</h3>
-              <div className="space-y-2">
-                {daySlots.sort((a, b) => a.startHour - b.startHour).map(s => (
-                  <div key={s.id} className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-700">{s.therapist.name}</span>
-                        {s.recurringId && (
-                          <span title="שיבוץ חוזר" className="flex items-center gap-0.5 text-xs text-green-500 bg-green-100 px-1.5 py-0.5 rounded-full">
-                            <RefreshCw size={10} /> חוזר
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm text-green-600 font-medium">{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
-                    </div>
-                    {s.note && <p className="text-xs text-gray-400 italic mt-1.5 pr-1">{s.note}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
