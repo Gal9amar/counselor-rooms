@@ -235,7 +235,7 @@ export default function MySchedulePage() {
                       </div>
                       {/* Hour labels */}
                       <div className="flex justify-between mt-0.5 px-0.5">
-                        {[22,20,18,16,14,12,10,8].map(h=>(
+                        {[8,10,12,14,16,18,20,22].map(h=>(
                           <span key={h} className="text-gray-300" style={{fontSize:'9px'}}>{h}</span>
                         ))}
                       </div>
