@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getRooms, getSchedule } from '../services/api';
-import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 const HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -25,6 +26,8 @@ function hLabel(h){return `${h}:00`;}
 function getNow(){const n=new Date();return{dateStr:toDateStr(n),hour:n.getHours(),minute:n.getMinutes()};}
 
 function RoomModal({room,onClose}){
+  const navigate=useNavigate();
+  const handleAddSlot=()=>{onClose();navigate('/schedule',{state:{preselectedRoomId:room.id}});};
   const today=new Date();today.setHours(0,0,0,0);
   const [year,setYear]=useState(today.getFullYear());
   const [month,setMonth]=useState(today.getMonth());
@@ -69,7 +72,13 @@ function RoomModal({room,onClose}){
               {selectedDate ? formatDateHe(selectedDate) : 'לחץ על יום לפרטים'}
             </p>
           </div>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={20}/></button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleAddSlot}
+              className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
+              <Plus size={14}/> הוסף שיבוץ
+            </button>
+            <button onClick={onClose} className="btn-ghost p-1.5"><X size={20}/></button>
+          </div>
         </div>
         {/* Month nav */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
