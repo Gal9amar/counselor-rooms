@@ -395,8 +395,27 @@ export default function SchedulePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1.5">הערה <span className="text-gray-400 font-normal text-xs">(לא חובה)</span></label>
-                <textarea className="input resize-none" rows={2} placeholder="לדוגמה: טיפול זוגי, יש להכין מצע..." value={note} onChange={e => setNote(e.target.value)} maxLength={200} />
+                {(() => {
+                  const _isAgaf = therapists.find(t => t.id === parseInt(selectedTherapist))?.name === 'אגף רווחה';
+                  return (
+                    <>
+                      <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                        הערה{' '}
+                        {_isAgaf
+                          ? <span className="text-red-500 text-xs font-semibold">* חובה</span>
+                          : <span className="text-gray-400 font-normal text-xs">(לא חובה)</span>}
+                      </label>
+                      <textarea
+                        className={`input resize-none${_isAgaf && !note.trim() ? ' border-red-300' : ''}`}
+                        rows={2}
+                        placeholder={_isAgaf ? 'נא פרט את מטרת השימוש בחדר...' : 'לדוגמה: טיפול זוגי, יש להכין מצע...'}
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        maxLength={200}
+                      />
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Recurring toggle */}
