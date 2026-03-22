@@ -193,7 +193,13 @@ export default function SchedulePage() {
   };
   const back = () => {
     if (step === 'hour') { setStep('date'); setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false); }
-    else if (step === 'date') { setStep('room'); setSelectedRoom(null); }
+    else if (step === 'date') { setStep('room'); setSelectedRoom(null);
+      // Reload stats for all rooms
+      const _n=new Date();
+      const _f=`${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-01`;
+      const _e=new Date(_n.getFullYear(),_n.getMonth()+4,0);
+      const _t=`${_e.getFullYear()}-${String(_e.getMonth()+1).padStart(2,'0')}-${String(_e.getDate()).padStart(2,'0')}`;
+      getSchedule({from:_f,to:_t}).then(s=>setAllSlots(s)); }
   };
 
   const toggleRecurDay = (day) => {
