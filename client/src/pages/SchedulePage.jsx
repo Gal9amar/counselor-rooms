@@ -532,18 +532,19 @@ export default function SchedulePage() {
               <h3 className="text-sm font-semibold text-gray-500 mb-2">שיבוצים ביום זה</h3>
               <div className="space-y-2">
                 {daySlots.sort((a, b) => a.startHour - b.startHour).map(s => (
-                  <div key={s.id} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-700">{s.therapist.name}</span>
-                      {s.recurringId && (
-                        <span title="שיבוץ חוזר" className="flex items-center gap-0.5 text-xs text-green-500 bg-green-100 px-1.5 py-0.5 rounded-full">
-                          <RefreshCw size={10} /> חוזר
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
+                  <div key={s.id} className="bg-green-50 border border-green-100 rounded-xl px-4 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-700">{s.therapist.name}</span>
+                        {s.recurringId && (
+                          <span title="שיבוץ חוזר" className="flex items-center gap-0.5 text-xs text-green-500 bg-green-100 px-1.5 py-0.5 rounded-full">
+                            <RefreshCw size={10} /> חוזר
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm text-green-600 font-medium">{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
                     </div>
+                    {s.note && <p className="text-xs text-gray-400 italic mt-1.5 pr-1">{s.note}</p>}
                   </div>
                 ))}
               </div>
