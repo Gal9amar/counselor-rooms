@@ -277,7 +277,7 @@ export default function SchedulePage() {
   if (loading) return <div className="text-center text-gray-400 py-20">טוען...</div>;
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full">
       {conflictModal && <ConflictModal conflicts={conflictModal} onClose={() => setConflictModal(null)} />}
       {deleteModal && <DeleteModal slot={deleteModal} onClose={() => setDeleteModal(null)} onDelete={confirmDelete} />}
 
