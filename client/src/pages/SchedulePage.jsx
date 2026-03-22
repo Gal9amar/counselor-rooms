@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getRooms, getTherapists, getSchedule, bookSlot, bookRecurring, clearSlot } from '../services/api';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, X, Repeat2, AlertTriangle, Trash2 } from 'lucide-react';
 
