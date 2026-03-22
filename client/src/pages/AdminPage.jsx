@@ -381,7 +381,7 @@ export default function AdminPage(){
               <div className="space-y-3">
                 {sortedRoomIds.map(rId=>{
                   const room=rooms.find(r=>r.id===parseInt(rId));
-                  const sortedDates=Object.keys(slotsByRoom[rId]).sort();
+                  const sortedDates=Object.keys(slotsByRoom[rId]||{}).sort();
                   return(
                   <div key={rId} className="card rounded-2xl overflow-hidden">
                     {/* Room header */}
