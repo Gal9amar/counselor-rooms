@@ -313,40 +313,46 @@ export default function SchedulePage() {
                   <span className="font-bold text-gray-800 text-lg">{room.name}</span>
                   <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
                 </div>
-                {/* 6-month stats strip */}
+                {/* Month stats */}
                 {(()=>{
-                  const todayD=new Date();todayD.setHours(0,0,0,0);
+                  const now=new Date();
+                  const y=now.getFullYear(),m=now.getMonth();
+                  const dim=new Date(y,m+1,0).getDate();
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
-                  const months=Array.from({length:3},(_,mi)=>{
-                    const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
-                    const y=d.getFullYear(),m=d.getMonth();
-                    const dim=new Date(y,m+1,0).getDate();
-                    // Use toDateStr to avoid timezone issues
-                    let bookedDays=0,freeDays=0;
-                    for(let dd=1;dd<=dim;dd++){
-                      const dow=new Date(y,m,dd).getDay();
-                      if(dow===6)continue;
-                      const daySlots=roomSlots.filter(s=>{const sd=new Date(s.date);return sd.getUTCFullYear()===y&&sd.getUTCMonth()===m&&sd.getUTCDate()===dd;});
-                      const bookedHours=daySlots.reduce((acc,s)=>acc+(s.endHour-s.startHour),0);
-                      if(bookedHours>=13){bookedDays++;}
-                      else{freeDays++;}
+                  // Count unique days with slots this month using date string
+                  const bookedDateSet=new Set();
+                  roomSlots.forEach(s=>{
+                    const sd=new Date(s.date);
+                    if(sd.getUTCFullYear()===y&&sd.getUTCMonth()===m){
+                      bookedDateSet.add(sd.getUTCDate());
                     }
-                    const workDays=bookedDays+freeDays;
-                    const pct=workDays>0?Math.round((bookedDays/workDays)*100):0;
-                    return{label:MONTHS_HE[m],booked:bookedDays,free:freeDays,pct};
                   });
+                  // Work days (no Saturday)
+                  let workDays=0;
+                  for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)workDays++;}
+                  const booked=bookedDateSet.size;
+                  const free=workDays-booked;
+                  const pct=workDays>0?Math.round((booked/workDays)*100):0;
                   return(
-                    <div className="flex justify-around">
-                      {months.map(({label,booked,free,pct},mi)=>(
-                        <div key={mi} className="flex-1 px-3 py-3 text-center border-r border-gray-100 last:border-0">
-                          <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
-                          <div className="h-2 rounded-full bg-gray-100 mb-2 overflow-hidden">
-                            <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
-                          </div>
-                          <p className="text-green-600 font-bold" style={{fontSize:'12px'}}>{booked} משובצים</p>
-                          <p className="text-gray-400" style={{fontSize:'11px'}}>{free} פנויים</p>
+                    <div className="px-5 pb-4 pt-3">
+                      <p className="text-xs text-gray-400 font-medium mb-2">{MONTHS_HE[m]} {y}</p>
+                      <div className="h-2 rounded-full bg-gray-100 mb-3 overflow-hidden">
+                        <div className="h-full rounded-full bg-green-400 transition-all" style={{width:`${pct}%`}}/>
+                      </div>
+                      <div className="flex justify-between">
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-green-600">{booked}</p>
+                          <p className="text-xs text-gray-400">ימים משובצים</p>
                         </div>
-                      ))}
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-gray-400">{free}</p>
+                          <p className="text-xs text-gray-400">ימים פנויים</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-gray-600">{workDays}</p>
+                          <p className="text-xs text-gray-400">סה"כ ימי עבודה</p>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
