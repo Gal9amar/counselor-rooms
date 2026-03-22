@@ -223,7 +223,7 @@ export default function MySchedulePage() {
                               style={{left:`${left}%`,width:`${width}%`}}
                               title={`${hLabel(s.startHour)}–${hLabel(s.endHour)}`}
                             >
-                              {width>15 && <span className="truncate px-1 text-[10px]">{hLabel(s.startHour)}</span>}
+                              {width>20 && <span className="truncate px-1 text-[10px] font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>}
                             </div>
                           );
                         })}
