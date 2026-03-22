@@ -156,12 +156,16 @@ export default function SchedulePage() {
 
   useEffect(() => {
     const _today = new Date();
-    const _from = `${_today.getFullYear()}-${String(_today.getMonth()+1).padStart(2,'0')}-01`;
-    const _future = new Date(_today.getFullYear(), _today.getMonth()+6, 0);
-    const _to = `${_future.getFullYear()}-${String(_future.getMonth()+1).padStart(2,'0')}-${String(_future.getDate()).padStart(2,'0')}`;
+    const _y = _today.getFullYear();
+    const _m = _today.getMonth();
+    const _from = `${_y}-${String(_m+1).padStart(2,'0')}-01`;
+    // 4 months: current + 3
+    const _endMonth = new Date(_y, _m+4, 0); // last day of month+3
+    const _to = `${_endMonth.getFullYear()}-${String(_endMonth.getMonth()+1).padStart(2,'0')}-${String(_endMonth.getDate()).padStart(2,'0')}`;
     Promise.all([getRooms(), getTherapists(), getSchedule({from:_from, to:_to})]).then(([r, t, s]) => {
       const sorted = [...r].sort((a, b) => (parseInt(a.name.replace(/\D/g, '')) || 0) - (parseInt(b.name.replace(/\D/g, '')) || 0));
       setRooms(sorted); setTherapists(t); setAllSlots(s); setLoading(false);
+      console.log('Loaded slots for stats:', s.length);
       // Auto-select room if navigated from dashboard
       const preId = location?.state?.preselectedRoomId;
       if (preId) {
@@ -277,7 +281,7 @@ export default function SchedulePage() {
   if (loading) return <div className="text-center text-gray-400 py-20">טוען...</div>;
 
   return (
-    <div className="w-full">
+    <div className="max-w-5xl mx-auto">
       {conflictModal && <ConflictModal conflicts={conflictModal} onClose={() => setConflictModal(null)} />}
       {deleteModal && <DeleteModal slot={deleteModal} onClose={() => setDeleteModal(null)} onDelete={confirmDelete} />}
 
@@ -313,7 +317,7 @@ export default function SchedulePage() {
                 {(()=>{
                   const todayD=new Date();todayD.setHours(0,0,0,0);
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
-                  const months=Array.from({length:6},(_,mi)=>{
+                  const months=Array.from({length:4},(_,mi)=>{
                     const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
                     const y=d.getFullYear(),m=d.getMonth();
                     const dim=new Date(y,m+1,0).getDate();
