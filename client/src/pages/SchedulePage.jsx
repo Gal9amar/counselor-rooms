@@ -155,9 +155,13 @@ export default function SchedulePage() {
   const [deleteModal, setDeleteModal] = useState(null); // slot to delete or null
 
   useEffect(() => {
-    Promise.all([getRooms(), getTherapists()]).then(([r, t]) => {
+    const _today = new Date();
+    const _from = `${_today.getFullYear()}-${String(_today.getMonth()+1).padStart(2,'0')}-01`;
+    const _future = new Date(_today.getFullYear(), _today.getMonth()+6, 0);
+    const _to = `${_future.getFullYear()}-${String(_future.getMonth()+1).padStart(2,'0')}-${String(_future.getDate()).padStart(2,'0')}`;
+    Promise.all([getRooms(), getTherapists(), getSchedule({from:_from, to:_to})]).then(([r, t, s]) => {
       const sorted = [...r].sort((a, b) => (parseInt(a.name.replace(/\D/g, '')) || 0) - (parseInt(b.name.replace(/\D/g, '')) || 0));
-      setRooms(sorted); setTherapists(t); setLoading(false);
+      setRooms(sorted); setTherapists(t); setAllSlots(s); setLoading(false);
       // Auto-select room if navigated from dashboard
       const preId = location?.state?.preselectedRoomId;
       if (preId) {
