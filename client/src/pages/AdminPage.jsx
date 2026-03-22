@@ -125,17 +125,22 @@ export default function AdminPage(){
   const [rooms,setRooms]=useState([]);
   const [therapists,setTherapists]=useState([]);
   const [slots,setSlots]=useState([]);
+  const _now=new Date();
+  const [filterYear,setFilterYear]=useState(_now.getFullYear());
+  const [filterMonth,setFilterMonth]=useState(_now.getMonth()); // 0-indexed
   const [newRoom,setNewRoom]=useState('');
   const [newTherapist,setNewTherapist]=useState('');
   const [error,setError]=useState('');
 
-  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll();}},[authed]);
+  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonth);}},[authed]);
 
-  const loadAll=async()=>{
-    const today=new Date();
-    const from=toDateStr(today);
-    const to=new Date(today);to.setFullYear(today.getFullYear()+2);
-    const [r,t,s]=await Promise.all([getRooms(),getTherapists(),getSchedule({from,to:toDateStr(to)})]);
+  const loadAll=async(year,month)=>{
+    const y=year??filterYear;
+    const m=month??filterMonth;
+    const from=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    const lastDay=new Date(y,m+1,0).getDate();
+    const to=`${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    const [r,t,s]=await Promise.all([getRooms(),getTherapists(),getSchedule({from,to})]);
     setRooms(r);setTherapists(t);setSlots(s);
   };
 
@@ -349,6 +354,31 @@ export default function AdminPage(){
       </div>
 
       {error&&<div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-4 text-sm">{error}</div>}
+
+      {/* Schedule filters — only shown on schedule tab */}
+      {tab==='schedule'&&(
+        <div className="flex gap-2 mb-5 flex-wrap items-center">
+          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+            {[filterYear-1,filterYear,filterYear+1].map(y=>(
+              <button key={y}
+                onClick={()=>{setFilterYear(y);loadAll(y,filterMonth);}}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  filterYear===y?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'
+                }`}>{y}</button>
+            ))}
+          </div>
+          <select
+            className="input py-1.5 text-sm w-auto"
+            value={filterMonth}
+            onChange={e=>{const m=parseInt(e.target.value);setFilterMonth(m);loadAll(filterYear,m);}}
+          >
+            {MONTHS_HE.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>
+          <span className="text-xs text-gray-400">
+            {slots.length} שיבוצים ב{MONTHS_HE[filterMonth]} {filterYear}
+          </span>
+        </div>
+      )}
 
       {tab==='rooms'&&(
         <div className="space-y-4">
