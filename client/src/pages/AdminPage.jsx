@@ -213,9 +213,12 @@ export default function AdminPage(){
       oneTimeSlots.push(s);
     }
   });
-  // Group by room, then by date
+  // Group ALL slots by room then date (including recurring)
   const slotsByRoom={};
-  oneTimeSlots.forEach(s=>{
+  const allOneTime=[...oneTimeSlots];
+  // Add recurring slots to the room grouping too
+  Object.values(recurringMap).forEach(series=>series.forEach(s=>allOneTime.push(s)));
+  allOneTime.forEach(s=>{
     const rId=s.roomId;
     if(!slotsByRoom[rId])slotsByRoom[rId]={};
     const ds=toDateStr(new Date(s.date));
