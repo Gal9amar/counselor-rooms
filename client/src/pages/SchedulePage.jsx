@@ -313,46 +313,94 @@ export default function SchedulePage() {
                   <span className="font-bold text-gray-800 text-lg">{room.name}</span>
                   <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
                 </div>
-                {/* Month stats */}
+                {/* 6-month stats strip */}
                 {(()=>{
-                  const now=new Date();
+                  const todayD=new Date();todayD.setHours(0,0,0,0);
                   const roomSlots=allSlots.filter(s=>s.roomId===room.id);
                   const months=Array.from({length:3},(_,mi)=>{
-                    const y=mi===0?now.getFullYear():new Date(now.getFullYear(),now.getMonth()+mi,1).getFullYear();
-                    const m=new Date(now.getFullYear(),now.getMonth()+mi,1).getMonth();
+                    const d=new Date(todayD.getFullYear(),todayD.getMonth()+mi,1);
+                    const y=d.getFullYear(),m=d.getMonth();
                     const dim=new Date(y,m+1,0).getDate();
-                    let workDays=0;
-                    for(let dd=1;dd<=dim;dd++){if(new Date(y,m,dd).getDay()!==6)workDays++;}
-                    // Use UTC month/year from date string
-                    const bookedSet=new Set();
-                    roomSlots.forEach(s=>{
-                      const utcY=parseInt(s.date.slice(0,4));
-                      const utcM=parseInt(s.date.slice(5,7))-1;
-                      const utcD=parseInt(s.date.slice(8,10));
-                      if(utcY===y&&utcM===m) bookedSet.add(utcD);
-                    });
-                    const booked=bookedSet.size;
-                    const free=Math.max(0,workDays-booked);
-                    const pct=workDays>0?Math.round((booked/workDays)*100):0;
-                    return{label:MONTHS_HE[m],booked,free,workDays,pct};
+                    // Use toDateStr to avoid timezone issues
+                    const pad=(n)=>String(n).padStart(2,'0');
+                    let bookedDays=0,freeDays=0;
+                    for(let dd=1;dd<=dim;dd++){
+                      const dow=new Date(y,m,dd).getDay();
+                      if(dow===6)continue;
+                      const dsKey=`${y}-${pad(m+1)}-${pad(dd)}`;
+                      const daySlots=roomSlots.filter(s=>toDateStr(new Date(s.date))===dsKey);
+                      const bookedHours=daySlots.reduce((acc,s)=>acc+(s.endHour-s.startHour),0);
+                      if(bookedHours>=13){bookedDays++;}
+                      else{freeDays++;}
+                    }
+                    const workDays=bookedDays+freeDays;
+                    const pct=workDays>0?Math.round((bookedDays/workDays)*100):0;
+                    return{label:MONTHS_HE[m],booked:bookedDays,free:freeDays,pct};
                   });
                   return(
-                    <div className="flex border-t border-gray-100">
-                      {months.map(({label,booked,free,workDays,pct},mi)=>(
-                        <div key={mi} className="flex-1 px-3 py-3 text-center border-r border-gray-100 last:border-0">
-                          <p className="text-xs font-bold text-gray-500 mb-2">{label}</p>
-                          <div className="h-1.5 rounded-full bg-gray-100 mb-2.5 overflow-hidden mx-1">
+                    <div className="flex overflow-x-auto" style={{scrollbarWidth:'none'}}>
+                      {months.map(({label,booked,free,pct},mi)=>(
+                        <div key={mi} className={`shrink-0 px-4 py-3 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'80px'}}>
+                          <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
+                          <div className="h-2 rounded-full bg-gray-100 mb-2 overflow-hidden">
                             <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
                           </div>
-                          <p className="font-bold text-green-600 text-base leading-tight">{booked}</p>
-                          <p className="text-gray-400 leading-tight" style={{fontSize:'10px'}}>משובצים</p>
-                          <p className="font-semibold text-gray-400 text-sm mt-1 leading-tight">{free}</p>
-                          <p className="text-gray-300 leading-tight" style={{fontSize:'10px'}}>פנויים</p>
+                          <p className="text-green-600 font-bold" style={{fontSize:'12px'}}>{booked} משובצים</p>
+                          <p className="text-gray-400" style={{fontSize:'11px'}}>{free} פנויים</p>
                         </div>
                       ))}
                     </div>
                   );
                 })()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 'date' && (
+        <div className="fade-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h1 className="section-title">{selectedRoom.name}</h1>
+              <p className="text-gray-400 text-sm">בחר תאריך לשיבוץ</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0 inline-block"/>
+              <span className="text-sm font-semibold text-gray-700">נקודה ירוקה = יש שיבוצים באותו יום</span>
+            </div>
+          </div>
+            <button onClick={handleAddYear} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-2 whitespace-nowrap">
+              <Plus size={15} /> הוסף שנה ({Math.max(...years) + 1})
+            </button>
+          </div>
+          <div className="flex gap-2 mb-5 flex-wrap">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+              {years.map(y => (
+                <button key={y} onClick={() => { setFilterYear(y); setFilterMonth(null); }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filterYear === y ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>{y}</button>
+              ))}
+            </div>
+            <select className="input rounded-xl px-3 py-1.5 text-sm w-auto" value={filterMonth ?? ''}
+              onChange={e => setFilterMonth(e.target.value === '' ? null : parseInt(e.target.value))}>
+              <option value="">כל החודשים</option>
+              {MONTHS_HE.map((m, i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+          </div>
+          <div className={`grid gap-4 ${filterMonth !== null ? 'grid-cols-1 max-w-sm' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {monthsToShow.map(month => {
+              const lastDay = new Date(filterYear, month + 1, 0);
+              if (lastDay < today) return null;
+              return (
+                <div key={month} className="card rounded-2xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">{MONTHS_HE[month]} {filterYear}</h3>
+                  <MonthCalendar year={filterYear} month={month} onSelectDate={handleSelectDate} slotDates={slotDates} selectedDate={selectedDate} />
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
 
       {step === 'hour' && (
         <div className="fade-up">
