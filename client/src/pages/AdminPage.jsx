@@ -213,9 +213,23 @@ export default function AdminPage(){
       oneTimeSlots.push(s);
     }
   });
-  const slotsByDate={};
-  oneTimeSlots.forEach(s=>{const k=toDateStr(new Date(s.date));if(!slotsByDate[k])slotsByDate[k]=[];slotsByDate[k].push(s);});
-  const sortedDates=Object.keys(slotsByDate).sort();
+  // Group by room, then by date
+  const slotsByRoom={};
+  oneTimeSlots.forEach(s=>{
+    const rId=s.roomId;
+    if(!slotsByRoom[rId])slotsByRoom[rId]={};
+    const ds=toDateStr(new Date(s.date));
+    if(!slotsByRoom[rId][ds])slotsByRoom[rId][ds]=[];
+    slotsByRoom[rId][ds].push(s);
+  });
+  // Sort rooms numerically by name
+  const sortedRoomIds=Object.keys(slotsByRoom).sort((a,b)=>{
+    const ra=rooms.find(r=>r.id===parseInt(a));
+    const rb=rooms.find(r=>r.id===parseInt(b));
+    const na=parseInt((ra?.name||'').replace(/[^0-9]/g,''))||0;
+    const nb=parseInt((rb?.name||'').replace(/[^0-9]/g,''))||0;
+    return na-nb;
+  });
 
   if(!authed)return(
     <div className="max-w-sm mx-auto mt-16 px-4 fade-up">
@@ -399,16 +413,28 @@ export default function AdminPage(){
             <div>
               <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><CalendarDays size={14}/> שיבוצים חד-פעמיים</h2>
               <div className="space-y-3">
-                {sortedDates.map(ds=>(
-                  <div key={ds} className="card rounded-2xl overflow-hidden">
-                    <div className="px-4 py-2.5 border-b border-gray-100 bg-green-50">
-                      <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
+                {sortedRoomIds.map(rId=>{
+                  const room=rooms.find(r=>r.id===parseInt(rId));
+                  const sortedDates=Object.keys(slotsByRoom[rId]).sort();
+                  return(
+                  <div key={rId} className="card rounded-2xl overflow-hidden">
+                    {/* Room header */}
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-800">
+                      <span className="font-bold text-white text-sm">{room?.name||'חדר לא ידוע'}</span>
                     </div>
-                    {slotsByDate[ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
+                    {sortedDates.map(ds=>(
+                      <div key={ds}>
+                        <div className="px-4 py-2 border-b border-gray-100 bg-green-50">
+                          <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
+                        </div>
+                        {slotsByRoom[rId][ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
                       <SlotRow key={s.id} slot={s} therapists={therapists} rooms={rooms} onSave={saveSlot} onDelete={()=>delSlot(s)}/>
+                        ))}
+                      </div>
                     ))}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
