@@ -409,7 +409,7 @@ export default function AdminPage(){
           )}
 
           {/* One-time slots by date */}
-          {sortedDates.length>0&&(
+          {sortedRoomIds.length>0&&(
             <div>
               <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><CalendarDays size={14}/> שיבוצים חד-פעמיים</h2>
               <div className="space-y-3">
@@ -439,7 +439,7 @@ export default function AdminPage(){
             </div>
           )}
 
-          {Object.keys(recurringMap).length===0&&sortedDates.length===0&&(
+          {Object.keys(recurringMap).length===0&&sortedRoomIds.length===0&&(
             <p className="text-gray-400 text-sm text-center py-10">אין שיבוצים</p>
           )}
         </div>
