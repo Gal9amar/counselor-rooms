@@ -322,13 +322,11 @@ export default function SchedulePage() {
                     const y=d.getFullYear(),m=d.getMonth();
                     const dim=new Date(y,m+1,0).getDate();
                     // Use toDateStr to avoid timezone issues
-                    const pad=(n)=>String(n).padStart(2,'0');
                     let bookedDays=0,freeDays=0;
                     for(let dd=1;dd<=dim;dd++){
                       const dow=new Date(y,m,dd).getDay();
                       if(dow===6)continue;
-                      const dsKey=`${y}-${pad(m+1)}-${pad(dd)}`;
-                      const daySlots=roomSlots.filter(s=>toDateStr(new Date(s.date))===dsKey);
+                      const daySlots=roomSlots.filter(s=>{const sd=new Date(s.date);return sd.getUTCFullYear()===y&&sd.getUTCMonth()===m&&sd.getUTCDate()===dd;});
                       const bookedHours=daySlots.reduce((acc,s)=>acc+(s.endHour-s.startHour),0);
                       if(bookedHours>=13){bookedDays++;}
                       else{freeDays++;}
@@ -338,9 +336,9 @@ export default function SchedulePage() {
                     return{label:MONTHS_HE[m],booked:bookedDays,free:freeDays,pct};
                   });
                   return(
-                    <div className="flex overflow-x-auto" style={{scrollbarWidth:'none'}}>
+                    <div className="flex justify-around">
                       {months.map(({label,booked,free,pct},mi)=>(
-                        <div key={mi} className={`shrink-0 px-4 py-3 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'80px'}}>
+                        <div key={mi} className="flex-1 px-3 py-3 text-center border-r border-gray-100 last:border-0">
                           <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
                           <div className="h-2 rounded-full bg-gray-100 mb-2 overflow-hidden">
                             <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
