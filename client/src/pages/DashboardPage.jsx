@@ -350,20 +350,24 @@ function TimelineView({rooms,slots}){
       {/* Controls */}
       <div className="px-4 py-3 border-b border-gray-100 bg-white rounded-t-2xl space-y-2">
         <div className="flex items-center gap-2">
-          <button onClick={prevNav} className="btn-ghost p-1.5 shrink-0"><ChevronRight size={18}/></button>
-          <button onClick={nextNav} className="btn-ghost p-1.5 shrink-0"><ChevronLeft size={18}/></button>
-          <span className="font-bold text-gray-800 text-sm flex-1 text-center">
-            {viewMode==='week'
-              ?`${addDays(weekStart,0).getDate()}/${addDays(weekStart,0).getMonth()+1} – ${addDays(weekStart,6).getDate()}/${addDays(weekStart,6).getMonth()+1}`
-              :`${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`}
-          </span>
-          <button onClick={goToday} className="btn-primary text-xs px-3 py-1.5 shrink-0">היום</button>
+          {/* Day/Week toggle */}
           <div className="flex bg-gray-100 rounded-xl p-0.5 gap-0.5 shrink-0">
             <button onClick={()=>{setViewMode('day');setExpandedSlot(null);}}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day'?'bg-white shadow-sm text-gray-800':'text-gray-400'}`}>יום</button>
             <button onClick={()=>{setViewMode('week');setExpandedSlot(null);}}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week'?'bg-white shadow-sm text-gray-800':'text-gray-400'}`}>שבוע</button>
           </div>
+          {/* Date with arrows on sides */}
+          <div className="flex items-center gap-1 flex-1 justify-center">
+            <button onClick={prevNav} className="btn-ghost p-1.5"><ChevronRight size={18}/></button>
+            <span className="font-bold text-gray-800 text-sm whitespace-nowrap px-1">
+              {viewMode==='week'
+                ?`${addDays(weekStart,0).getDate()}/${addDays(weekStart,0).getMonth()+1} – ${addDays(weekStart,6).getDate()}/${addDays(weekStart,6).getMonth()+1}`
+                :`${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`}
+            </span>
+            <button onClick={nextNav} className="btn-ghost p-1.5"><ChevronLeft size={18}/></button>
+          </div>
+          <button onClick={goToday} className="btn-primary text-xs px-3 py-1.5 shrink-0">היום</button>
         </div>
         <select className="input py-2 text-sm w-full" value={filterRoom}
           onChange={e=>{setFilterRoom(e.target.value);setExpandedSlot(null);}}>
