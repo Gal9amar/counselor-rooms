@@ -543,9 +543,6 @@ export default function SchedulePage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-green-600 font-medium">{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
-                      <button onClick={() => handleDeleteSlot(s)} className="text-gray-300 hover:text-red-400 transition-colors">
-                        <X size={15} />
-                      </button>
                     </div>
                   </div>
                 ))}
