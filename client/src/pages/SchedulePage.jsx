@@ -347,7 +347,7 @@ export default function SchedulePage() {
               );
             })}
           </div>
-          <p className="text-xs text-gray-400 mt-4 text-center">נקודה ירוקה = יש שיבוצים באותו יום</p>
+
         </div>
       )}
 
