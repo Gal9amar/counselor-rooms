@@ -369,49 +369,6 @@ export default function AdminPage(){
       {tab==='schedule'&&(
         <div className="space-y-6">
 
-          {/* Recurring series */}
-          {Object.keys(recurringMap).length>0&&(
-            <div>
-              <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><RefreshCw size={14}/> מופעים חוזרים</h2>
-              <div className="space-y-3">
-                {Object.entries(recurringMap).map(([rid,seriesSlots])=>{
-                  const first=seriesSlots[0];
-                  const sorted=[...seriesSlots].sort((a,b)=>new Date(a.date)-new Date(b.date));
-                  const firstDate=toDateStr(new Date(sorted[0].date));
-                  const lastDate=toDateStr(new Date(sorted[sorted.length-1].date));
-                  const days=first.recurring?.daysOfWeek||[];
-                  const freq=first.recurring?.frequency;
-                  return(
-                    <div key={rid} className="card rounded-2xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-100 bg-blue-50 flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="flex items-center gap-1 text-blue-600 font-semibold text-sm"><RefreshCw size={13}/>{FREQ_HE[freq]||freq}</span>
-                          {days.length>0&&<span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">{days.map(d=>DAYS_SHORT[d]).join(' ')}</span>}
-                          <span className="text-xs text-gray-500">{hLabel(first.startHour)}–{hLabel(first.endHour)}</span>
-                          <span className="text-xs text-gray-400">{first.therapist.name}</span>
-                          {first.room&&<span className="text-xs text-gray-400">· {first.room.name}</span>}
-                        </div>
-                        <div className="flex gap-1">
-                          <button onClick={()=>openEditRecurring(rid,seriesSlots)} className="text-gray-300 hover:text-blue-500 transition-colors p-1"><Pencil size={14}/></button>
-                          <button onClick={()=>delSlot({...first,recurringId:parseInt(rid)})} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={15}/></button>
-                        </div>
-                      </div>
-                      <div className="px-4 py-2.5 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-                        <CalendarDays size={13} className="text-gray-400"/>
-                        <span>{formatDateHe(firstDate)}</span>
-                        <span className="text-gray-300">→</span>
-                        <span>{formatDateHe(lastDate)}</span>
-                        <span className="mr-auto bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{sorted.length} שיבוצים</span>
-                        {first.note&&<span className="italic text-gray-400">· {first.note}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* One-time slots by date */}
           {sortedRoomIds.length>0&&(
             <div>
               <h2 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5"><CalendarDays size={14}/> שיבוצים חד-פעמיים</h2>
