@@ -193,7 +193,7 @@ export default function SchedulePage() {
   };
   const back = () => {
     if (step === 'hour') { setStep('date'); setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false); }
-    else if (step === 'date') { setStep('room'); setSelectedRoom(null); setAllSlots([]); }
+    else if (step === 'date') { setStep('room'); setSelectedRoom(null); }
   };
 
   const toggleRecurDay = (day) => {
