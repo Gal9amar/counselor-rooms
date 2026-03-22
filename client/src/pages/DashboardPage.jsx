@@ -150,6 +150,12 @@ function RoomCard({room,slots,onClick,index}){
     return false;
   }):null;
 
+  // All slots on the same day as "next" (the upcoming day)
+  const nextDayStr=next?toDateStr(new Date(next.date)):null;
+  const nextDaySlots=nextDayStr
+    ?roomSlots.filter(s=>toDateStr(new Date(s.date))===nextDayStr&&s.endHour>nowDecimal)
+    :[];
+
   const isActive=!!active;
 
   return(
@@ -176,11 +182,28 @@ function RoomCard({room,slots,onClick,index}){
           </div>
         )}
         {!active&&next&&(
-          <div className="rounded-xl bg-green-50 border border-green-100 px-3 py-2.5 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-green-600 text-xs font-semibold"><CalendarDays size={12} className="shrink-0"/><span>הבא: {formatNextDate(toDateStr(new Date(next.date)))}</span></div>
-            <div className="flex items-center gap-2 text-gray-800"><User size={14} className="text-green-500 shrink-0"/><span className="font-semibold">{next.therapist.name}</span></div>
-            <div className="flex items-center gap-2 text-green-700 text-sm font-medium"><Clock size={12} className="shrink-0"/><span>{hLabel(next.startHour)} – {hLabel(next.endHour)}</span></div>
-            {next.note && <p className="text-xs text-gray-400 italic">{next.note}</p>}
+          <div className="rounded-xl bg-green-50 border border-green-100 px-3 py-2 flex flex-col" style={{maxHeight:'160px'}}>
+            {/* Day header */}
+            <div className="flex items-center gap-1.5 text-green-700 text-xs font-bold pb-1.5 border-b border-green-100 shrink-0">
+              <CalendarDays size={12} className="shrink-0"/>
+              <span>שיבוץ קרוב: {formatNextDate(nextDayStr)}</span>
+              {nextDaySlots.length>1&&<span className="mr-auto bg-green-200 text-green-800 rounded-full px-1.5 text-xs">{nextDaySlots.length}</span>}
+            </div>
+            {/* Scrollable list */}
+            <div className="overflow-y-auto mt-1.5 space-y-1.5 pl-0.5" style={{scrollbarWidth:'thin'}}>
+              {nextDaySlots.map(s=>(
+                <div key={s.id} className="flex flex-col gap-0.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-gray-800">
+                      <User size={12} className="text-green-500 shrink-0"/>
+                      <span className="text-sm font-semibold">{s.therapist.name}</span>
+                    </div>
+                    <span className="text-green-700 text-xs font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>
+                  </div>
+                  {s.note&&<p className="text-xs text-gray-400 italic pr-4">{s.note}</p>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
