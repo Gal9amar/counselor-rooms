@@ -301,8 +301,8 @@ export default function SchedulePage() {
               <button key={room.id} onClick={() => handleSelectRoom(room)}
                 className={`card card-clickable rounded-2xl text-right fade-up-${Math.min(i, 3)} overflow-hidden`}>
                 {/* Header */}
-                <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
-                  <span className="font-bold text-gray-800 text-base">{room.name}</span>
+                <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
+                  <span className="font-bold text-gray-800 text-lg">{room.name}</span>
                   <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
                 </div>
                 {/* 6-month stats strip */}
@@ -331,13 +331,13 @@ export default function SchedulePage() {
                   return(
                     <div className="flex overflow-x-auto" style={{scrollbarWidth:'none'}}>
                       {months.map(({label,booked,free,pct},mi)=>(
-                        <div key={mi} className={`shrink-0 px-3 py-2.5 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'70px'}}>
-                          <p className="text-xs font-bold text-gray-600 mb-1.5">{label}</p>
-                          <div className="h-1.5 rounded-full bg-gray-100 mb-1.5 overflow-hidden">
+                        <div key={mi} className={`shrink-0 px-4 py-3 text-center border-r border-gray-100 last:border-0`} style={{minWidth:'80px'}}>
+                          <p className="text-xs font-bold text-gray-700 mb-2">{label}</p>
+                          <div className="h-2 rounded-full bg-gray-100 mb-2 overflow-hidden">
                             <div className="h-full rounded-full bg-green-400" style={{width:`${pct}%`}}/>
                           </div>
-                          <p className="text-green-600 font-bold" style={{fontSize:'11px'}}>{booked} משובצים</p>
-                          <p className="text-gray-400" style={{fontSize:'10px'}}>{free} פנויים</p>
+                          <p className="text-green-600 font-bold" style={{fontSize:'12px'}}>{booked} משובצים</p>
+                          <p className="text-gray-400" style={{fontSize:'11px'}}>{free} פנויים</p>
                         </div>
                       ))}
                     </div>
