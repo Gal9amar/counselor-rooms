@@ -55,7 +55,7 @@ export default function Layout() {
             <div className="flex items-center gap-3">
               {installPrompt && (
                 <button onClick={handleInstall} className="flex items-center gap-1.5 text-xs text-green-600 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 transition-colors">
-                  <Download size={14} /> התקן אפליקציה
+                  <Download size={14} /> הורדה למחשב
                 </button>
               )}
               <img src="/logo-right.png" alt="אופק" className="h-10 w-auto object-contain" />
