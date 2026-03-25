@@ -11,6 +11,9 @@
 body {
   background-color: #f8faf8;
   color: #1a2e1a;
+  font-size: 1rem;
+  line-height: 1.7;
+  word-spacing: 0.05em;
 }
 
 /* Subtle green tint on background */
@@ -136,7 +139,7 @@ body::before {
   transition: all 0.2s;
   width: 100%;
   padding: 0.625rem 0.875rem;
-  font-size: 0.9375rem;
+  font-size: 1rem;
 }
 .input:focus {
   outline: none;
@@ -150,23 +153,21 @@ body::before {
   background: linear-gradient(135deg, #fee2e2, #fca5a5);
   color: #991b1b;
   border: 1px solid #f87171;
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   padding: 0.22rem 0.7rem;
   border-radius: 999px;
   box-shadow: 0 1px 4px rgba(239,68,68,0.25);
-  letter-spacing: 0.01em;
 }
 .badge-free {
   background: linear-gradient(135deg, #dcfce7, #bbf7d0);
   color: #14532d;
   border: 1px solid #4ade80;
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   padding: 0.22rem 0.7rem;
   border-radius: 999px;
   box-shadow: 0 1px 4px rgba(22,163,74,0.2);
-  letter-spacing: 0.01em;
 }
 
 /* Nav */
@@ -194,7 +195,6 @@ body::before {
   font-size: 1.5rem;
   font-weight: 700;
   color: #111827;
-  letter-spacing: -0.02em;
 }
 
 /* Divider */

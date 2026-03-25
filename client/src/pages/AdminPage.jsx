@@ -76,7 +76,7 @@ function SlotRow({slot,therapists,rooms,onSave,onDelete}){
             <select className="input py-1.5 text-sm w-auto" value={rid} onChange={e=>setRid(parseInt(e.target.value))}>
               {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
-            <input type="date" className="input py-1.5 text-sm w-auto" value={dt} onChange={e=>setDt(e.target.value)}/>
+            <input type="date" dir="ltr" className="input py-1.5 text-sm w-auto" value={dt} onChange={e=>setDt(e.target.value)}/>
             <select className="input py-1.5 text-sm w-auto" value={sh} onChange={e=>setSh(parseInt(e.target.value))}>
               {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
             </select>

@@ -547,13 +547,13 @@ export default function SchedulePage() {
                       </div>
                       {recurEndMode === 'occurrences' ? (
                         <div className="flex items-center gap-2">
-                          <input type="number" min={1} max={200} value={recurOccurrences}
+                          <input type="number" dir="ltr" min={1} max={200} value={recurOccurrences}
                             onChange={e => setRecurOccurrences(e.target.value)}
                             className="input text-center" style={{width:'5rem'}} />
                           <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
                         </div>
                       ) : (
-                        <input type="date" value={recurEndDate} min={selectedDate}
+                        <input type="date" dir="ltr" value={recurEndDate} min={selectedDate}
                           onChange={e => setRecurEndDate(e.target.value)}
                           className="input w-auto" />
                       )}
