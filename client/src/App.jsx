@@ -55,7 +55,7 @@ function LoadingOverlay() {
         <p style={{
           color: '#15803d',
           fontFamily: 'Rubik, sans-serif',
-          fontSize: '15px',
+          fontSize: '16px',
           fontWeight: 600,
           opacity: fade ? 1 : 0,
           transition: 'opacity 0.2s ease',
