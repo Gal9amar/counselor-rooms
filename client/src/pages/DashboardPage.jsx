@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getRooms, getSchedule } from '../services/api';
+import { getRooms, getSchedule, getRoomNotes } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
@@ -179,7 +179,7 @@ function RoomModal({room,onClose}){
 }
 
 
-function RoomCard({room,slots,onClick,index}){
+function RoomCard({room,slots,notes,onClick,index}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
 
@@ -218,19 +218,33 @@ function RoomCard({room,slots,onClick,index}){
 
   const isActive=!!active;
 
+  // Active room notes for today
+  const todayMidnight=new Date(dateStr+'T00:00:00');
+  const activeNotes=(notes||[]).filter(n=>{
+    const s=new Date(n.startDate);s.setHours(0,0,0,0);
+    const e=new Date(n.endDate);e.setHours(23,59,59,999);
+    if(todayMidnight<s||todayMidnight>e) return false;
+    if(n.startHour!=null&&n.endHour!=null){return hour>=n.startHour&&hour<n.endHour;}
+    return true;
+  });
+
+  const isBlocked=!isActive&&activeNotes.some(n=>n.blocksBooking);
+
   return(
     <button onClick={onClick}
       className={`w-full text-right rounded-2xl overflow-hidden fade-up-${Math.min(index,3)} card card-clickable flex flex-col ${isActive?'card-active pulse-ring':''}`}
       style={{minHeight:'160px'}}>
       {/* Indicator bar */}
-      <div className={`h-1 w-full shrink-0 ${isActive?'bg-gradient-to-l from-red-400 to-red-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
+      <div className={`h-1 w-full shrink-0 ${isActive?'bg-gradient-to-l from-red-400 to-red-300':isBlocked?'bg-gradient-to-l from-orange-400 to-orange-300':'bg-gradient-to-l from-green-400 to-green-300'}`}/>
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-semibold text-gray-800">{room.name}</h3>
-          <span className={isActive?'badge-active':'badge-free'}>
+          <span className={isActive?'badge-active':isBlocked?'bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded-full':'badge-free'}>
             {isActive
               ?<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-red-500 rounded-full pulse-dot inline-block"/>תפוס</span>
-              :<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"/>פנוי</span>
+              :isBlocked
+                ?<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-orange-500 rounded-full inline-block"/>חסום</span>
+                :<span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"/>פנוי</span>
             }
           </span>
         </div>
@@ -267,6 +281,29 @@ function RoomCard({room,slots,onClick,index}){
           </div>
         )}
         {!active&&!next&&<p className="text-gray-400 text-sm">אין שיבוצים קרובים</p>}
+        {activeNotes.length>0&&(
+          <div className="mt-2 space-y-1">
+            {activeNotes.map(n=>{
+              const fmt=d=>new Date(d).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});
+              const sameDay=fmt(n.startDate)===fmt(n.endDate);
+              const datePart=sameDay?fmt(n.startDate):`${fmt(n.startDate)} – ${fmt(n.endDate)}`;
+              const hasHours=n.startHour!=null&&n.endHour!=null;
+              const periodText=hasHours
+                ?`${datePart} · ${n.startHour}:00–${n.endHour}:00`
+                :datePart;
+              const color=n.blocksBooking?{text:'text-red-800',sub:'text-red-500',bg:'bg-red-50 border-red-200'}:{text:'text-amber-800',sub:'text-amber-600',bg:'bg-amber-50 border-amber-200'};
+              return(
+              <div key={n.id} className={`rounded-xl px-3 py-2 border ${color.bg}`}>
+                <div className="flex items-start gap-1.5">
+                  <span className="text-sm shrink-0">{n.blocksBooking?'🚫':'⚠️'}</span>
+                  <p className={`text-xs font-medium leading-snug ${color.text}`}>{n.message}</p>
+                </div>
+                <p className={`text-xs mt-0.5 pr-5 ${color.sub}`}>{periodText}</p>
+              </div>
+              );
+            })}
+          </div>
+        )}
         <p className="text-xs text-gray-400 mt-auto pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי ←</p>
       </div>
     </button>
@@ -504,6 +541,7 @@ function WhoIsIn({slots}){
 export default function DashboardPage(){
   const [rooms,setRooms]=useState([]);
   const [slots,setSlots]=useState([]);
+  const [roomNotes,setRoomNotes]=useState([]);
   const [loading,setLoading]=useState(true);
   const [lastUpdated,setLastUpdated]=useState(null);
   const [view,setView]=useState('grid');
@@ -513,9 +551,9 @@ export default function DashboardPage(){
     try{
       const today=new Date();
       const future=new Date(today);future.setDate(today.getDate()+30);
-      const [r,s]=await Promise.all([getRooms(),getSchedule({from:toDateStr(today),to:toDateStr(future)})]);
+      const [r,s,n]=await Promise.all([getRooms(),getSchedule({from:toDateStr(today),to:toDateStr(future)}),getRoomNotes()]);
       const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
-      setRooms(sortedR);setSlots(s);setLastUpdated(new Date());
+      setRooms(sortedR);setSlots(s);setRoomNotes(n);setLastUpdated(new Date());
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
@@ -560,7 +598,7 @@ export default function DashboardPage(){
             rooms.length===0
               ?<div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} index={i} onClick={()=>setModalRoom(room)}/>)}
+                {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={roomNotes.filter(n=>n.roomId===room.id)} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
           ):<TimelineView rooms={rooms} slots={slots}/>}
         </>

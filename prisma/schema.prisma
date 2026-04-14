@@ -12,8 +12,23 @@ datasource db {
 model Room {
   id            Int            @id @default(autoincrement())
   name          String         @unique
+  order         Int            @default(0)
   createdAt     DateTime       @default(now())
   scheduleSlots ScheduleSlot[]
+  notes         RoomNote[]
+}
+
+model RoomNote {
+  id            Int      @id @default(autoincrement())
+  roomId        Int
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message       String
+  startDate     DateTime
+  endDate       DateTime
+  startHour     Int?
+  endHour       Int?
+  blocksBooking Boolean  @default(false)
+  createdAt     DateTime @default(now())
 }
 
 model Therapist {

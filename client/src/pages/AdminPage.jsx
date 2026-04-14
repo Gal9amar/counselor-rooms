@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   verifyAdmin, setAdminPassword,
-  getRooms, addRoom, updateRoom, deleteRoom,
+  getRooms, addRoom, updateRoom, deleteRoom, reorderRooms,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
   getSchedule, updateSlot, clearSlot, updateRecurring, deleteRecurring,
+  getRoomNotes, addRoomNote, deleteRoomNote,
 } from '../services/api';
-import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays } from 'lucide-react';
+import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays, GripVertical, MessageSquarePlus, AlertTriangle } from 'lucide-react';
 
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
@@ -17,7 +18,7 @@ function toDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 function formatDateHe(ds){const d=new Date(ds+'T00:00:00');return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;}
 function hLabel(h){return `${h}:00`;}
 
-function EditableRow({item,onRename,onDelete,placeholder}){
+function EditableRow({item,onRename,onDelete,placeholder,dragHandleProps}){
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(item.name);
   const [loading,setLoading]=useState(false);
@@ -31,6 +32,11 @@ function EditableRow({item,onRename,onDelete,placeholder}){
   };
   return(
     <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 last:border-0">
+      {dragHandleProps&&(
+        <span {...dragHandleProps} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none">
+          <GripVertical size={16}/>
+        </span>
+      )}
       {editing?(
         <>
           <input autoFocus className="input flex-1 py-1.5 text-sm" value={val}
@@ -76,12 +82,18 @@ export default function AdminPage(){
   const [slots,setSlots]=useState([]);
   const _now=new Date();
   const [filterYear,setFilterYear]=useState(_now.getFullYear());
-  const [filterMonths,setFilterMonths]=useState([_now.getMonth()]); // array
+  const [filterMonths,setFilterMonths]=useState([_now.getMonth()]);
+  const [filterTherapistId,setFilterTherapistId]=useState(null);
   const [newRoom,setNewRoom]=useState('');
   const [newTherapist,setNewTherapist]=useState('');
   const [error,setError]=useState('');
+  const [roomNotes,setRoomNotes]=useState([]);
+  const [noteModal,setNoteModal]=useState(null); // roomId | null
+  const [noteForm,setNoteForm]=useState({message:'',startDate:'',endDate:'',startHour:'',endHour:'',blocksBooking:false});
+  const [noteSaving,setNoteSaving]=useState(false);
+  const [noteError,setNoteError]=useState('');
 
-  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);}},[authed]);
+  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);getRoomNotes().then(setRoomNotes).catch(()=>{});}},[authed]);
 
   const loadAll=async(year,months)=>{
     const y=year??filterYear;
@@ -100,6 +112,26 @@ export default function AdminPage(){
 
   const handleLogin=async()=>{try{await verifyAdmin(password);sessionStorage.setItem('adminPass',password);setAdminPassword(password);setAuthed(true);}catch{setAuthError('סיסמה שגויה');}};
   const addR=async()=>{if(!newRoom.trim())return;try{await addRoom(newRoom.trim());setNewRoom('');setError('');setRooms(await getRooms());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
+
+  const saveNote=async()=>{
+    const {message,startDate,endDate,startHour,endHour,blocksBooking}=noteForm;
+    if(!message.trim()||!startDate||!endDate){setNoteError('יש למלא הודעה, תאריך התחלה וסיום');return;}
+    const sh=startHour!==''?parseInt(startHour):null;
+    const eh=endHour!==''?parseInt(endHour):null;
+    if(sh!=null&&eh!=null&&eh<=sh){setNoteError('שעת סיום אחרי שעת התחלה');return;}
+    setNoteSaving(true);setNoteError('');
+    try{
+      const n=await addRoomNote({roomId:noteModal,message:message.trim(),startDate,endDate,startHour:sh,endHour:eh,blocksBooking});
+      setRoomNotes(p=>[...p,n]);
+      setNoteModal(null);
+    }catch(e){setNoteError(e.response?.data?.error||'שגיאה');}
+    finally{setNoteSaving(false);}
+  };
+  const removeNote=async(id)=>{
+    try{await deleteRoomNote(id);setRoomNotes(p=>p.filter(n=>n.id!==id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+
   const renR=async(id,n)=>{try{await updateRoom(id,n);setRooms(p=>p.map(r=>r.id===id?{...r,name:n}:r));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
   const delR=async(id)=>{
     const r=rooms.find(r=>r.id===id);
@@ -164,6 +196,24 @@ export default function AdminPage(){
     }catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
 
+  const [dragRoomId,setDragRoomId]=useState(null);
+  const [dragOverRoomId,setDragOverRoomId]=useState(null);
+
+  const handleRoomDragEnd=async()=>{
+    if(dragRoomId==null||dragOverRoomId==null||dragRoomId===dragOverRoomId){
+      setDragRoomId(null);setDragOverRoomId(null);return;
+    }
+    const from=rooms.findIndex(r=>r.id===dragRoomId);
+    const to=rooms.findIndex(r=>r.id===dragOverRoomId);
+    const reordered=[...rooms];
+    const [moved]=reordered.splice(from,1);
+    reordered.splice(to,0,moved);
+    setRooms(reordered);
+    setDragRoomId(null);setDragOverRoomId(null);
+    try{await reorderRooms(reordered.map(r=>r.id));}
+    catch{setRooms(rooms);}
+  };
+
   const [deleteModal,setDeleteModal]=useState(null);
   const [editRecurring,setEditRecurring]=useState(null);
   const [editRecurringErr,setEditRecurringErr]=useState('');
@@ -188,9 +238,14 @@ export default function AdminPage(){
     finally{setEditSlotSaving(false);}
   };
 
+  const [deleteSingleModal,setDeleteSingleModal]=useState(null);
+
   const delSlot=async(slot)=>{
     if(slot.recurringId){setDeleteModal(slot);return;}
-    if(!confirm('למחוק שיבוץ זה?'))return;
+    setDeleteSingleModal(slot);
+  };
+  const confirmDeleteSingle=async()=>{
+    const slot=deleteSingleModal;setDeleteSingleModal(null);
     try{await clearSlot(slot.id,'single');setSlots(p=>p.filter(s=>s.id!==slot.id));}
     catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
@@ -204,10 +259,13 @@ export default function AdminPage(){
     }catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
 
+  // Apply therapist filter
+  const visibleSlots=filterTherapistId?slots.filter(s=>s.therapistId===filterTherapistId):slots;
+
   // Separate recurring series from one-time slots
   const recurringMap={};
   const oneTimeSlots=[];
-  slots.forEach(s=>{
+  visibleSlots.forEach(s=>{
     if(s.recurringId){
       if(!recurringMap[s.recurringId])recurringMap[s.recurringId]=[];
       recurringMap[s.recurringId].push(s);
@@ -260,7 +318,11 @@ export default function AdminPage(){
     </div>
   );
 
-  const tabs=[{id:'rooms',label:'חדרים'},{id:'therapists',label:'מטפלים'},{id:'schedule',label:'שיבוצים'}];
+  const tabs=[
+    {id:'rooms',label:'חדרים',count:rooms.length},
+    {id:'therapists',label:'מטפלים',count:therapists.length},
+    {id:'schedule',label:'שיבוצים',count:slots.length},
+  ];
 
   return(
     <>
@@ -390,6 +452,91 @@ export default function AdminPage(){
           </div>
         </div>
       )}
+      {deleteSingleModal&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setDeleteSingleModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center"><Trash2 size={18} className="text-red-500"/></div>
+              <h3 className="font-bold text-gray-800">מחיקת שיבוץ</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium">{deleteSingleModal.therapist?.name}</span>
+              {' · '}{hLabel(deleteSingleModal.startHour)}–{hLabel(deleteSingleModal.endHour)}
+            </p>
+            <p className="text-sm text-gray-400 mb-5">{formatDateHe(toDateStr(new Date(deleteSingleModal.date)))}</p>
+            <div className="flex gap-2">
+              <button onClick={confirmDeleteSingle} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">מחק</button>
+              <button onClick={()=>setDeleteSingleModal(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {noteModal&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setNoteModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <AlertTriangle size={16} className="text-amber-500"/> הוספת הערה לחדר
+              </h3>
+              <button onClick={()=>setNoteModal(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">הודעה</label>
+                <input className="input py-2 text-sm" placeholder='למשל: "בתיקון עד יום ה׳"'
+                  value={noteForm.message} onChange={e=>setNoteForm(p=>({...p,message:e.target.value}))} maxLength={200}/>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">מתאריך</label>
+                  <input type="date" dir="ltr" className="input py-2 text-sm"
+                    value={noteForm.startDate} onChange={e=>setNoteForm(p=>({...p,startDate:e.target.value}))}/>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">עד תאריך</label>
+                  <input type="date" dir="ltr" className="input py-2 text-sm"
+                    value={noteForm.endDate} onChange={e=>setNoteForm(p=>({...p,endDate:e.target.value}))}/>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שעות (אופציונלי)</label>
+                <div className="flex items-center gap-2">
+                  <select className="input py-2 text-sm flex-1" value={noteForm.startHour}
+                    onChange={e=>setNoteForm(p=>({...p,startHour:e.target.value}))}>
+                    <option value="">כל היום</option>
+                    {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{h}:00</option>)}
+                  </select>
+                  <span className="text-gray-400 text-sm shrink-0">עד</span>
+                  <select className="input py-2 text-sm flex-1" value={noteForm.endHour}
+                    onChange={e=>setNoteForm(p=>({...p,endHour:e.target.value}))}>
+                    <option value="">כל היום</option>
+                    {ALL_HOURS.filter(h=>noteForm.startHour===''||h>parseInt(noteForm.startHour)).map(h=><option key={h} value={h}>{h}:00</option>)}
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={()=>setNoteForm(p=>({...p,blocksBooking:!p.blocksBooking}))}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                  noteForm.blocksBooking
+                    ?'bg-red-50 border-red-200 text-red-700'
+                    :'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                <span className="text-sm font-medium">חסום שיבוצים בזמן ההערה</span>
+                <div dir="ltr" className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${noteForm.blocksBooking?'bg-red-500':'bg-gray-300'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${noteForm.blocksBooking?'translate-x-4':'translate-x-0'}`}/>
+                </div>
+              </button>
+              {noteError&&<p className="text-red-500 text-xs">{noteError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={saveNote} disabled={noteSaving} className="btn-primary flex-1 py-2.5 text-sm">
+                  {noteSaving?'שומר...':'הוסף הערה'}
+                </button>
+                <button onClick={()=>setNoteModal(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="fade-up">
       <div className="flex items-center justify-between mb-8">
         <h1 className="section-title">פאנל מנהל</h1>
@@ -399,8 +546,9 @@ export default function AdminPage(){
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>{setTab(t.id);setError('');}}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${tab===t.id?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'}`}>
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${tab===t.id?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'}`}>
             {t.label}
+            {t.count>0&&<span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${tab===t.id?'bg-green-100 text-green-700':'bg-gray-200 text-gray-500'}`}>{t.count}</span>}
           </button>
         ))}
       </div>
@@ -442,7 +590,30 @@ export default function AdminPage(){
               );
             })}
           </div>
-          <span className="text-xs text-gray-400">{slots.length} שיבוצים</span>
+          {/* Therapist filter */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={()=>setFilterTherapistId(null)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                filterTherapistId===null
+                  ?'bg-gray-700 text-white border-gray-700 shadow-sm'
+                  :'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
+              }`}>הכל</button>
+            {therapists.map(t=>(
+              <button key={t.id}
+                onClick={()=>setFilterTherapistId(p=>p===t.id?null:t.id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                  filterTherapistId===t.id
+                    ?'bg-gray-700 text-white border-gray-700 shadow-sm'
+                    :'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
+                }`}>{t.name}</button>
+            ))}
+          </div>
+          <span className="text-xs text-gray-400">
+            {filterTherapistId
+              ? slots.filter(s=>s.therapistId===filterTherapistId).length
+              : slots.length} שיבוצים
+          </span>
         </div>
       )}
 
@@ -455,7 +626,47 @@ export default function AdminPage(){
           </div>
           <div className="card rounded-2xl overflow-hidden">
             {rooms.length===0&&<p className="text-gray-400 text-sm text-center py-6">אין חדרים</p>}
-            {rooms.map(r=><EditableRow key={r.id} item={r} onRename={renR} onDelete={delR} placeholder="שם חדר"/>)}
+            {rooms.map(r=>{
+              const rNotes=roomNotes.filter(n=>n.roomId===r.id);
+              return(
+              <div key={r.id}
+                draggable
+                onDragStart={()=>setDragRoomId(r.id)}
+                onDragOver={e=>{e.preventDefault();setDragOverRoomId(r.id);}}
+                onDragEnd={handleRoomDragEnd}
+                className={`transition-colors ${dragOverRoomId===r.id&&dragRoomId!==r.id?'bg-green-50':''} ${dragRoomId===r.id?'opacity-50':''}`}>
+                <div className="flex items-center gap-2 border-b border-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <EditableRow item={r} onRename={renR} onDelete={delR} placeholder="שם חדר"
+                      dragHandleProps={{draggable:false,onMouseDown:e=>e.stopPropagation()}}/>
+                  </div>
+                  <button onClick={()=>{setNoteModal(r.id);setNoteForm({message:'',startDate:'',endDate:'',startHour:'',endHour:'',blocksBooking:false});setNoteError('');}}
+                    className="flex items-center gap-1 text-xs font-medium text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 transition-colors ml-3 shrink-0">
+                    <MessageSquarePlus size={13}/> הערה
+                  </button>
+                </div>
+                {rNotes.length>0&&(
+                  <div className="px-4 py-2 space-y-1.5 bg-amber-50 border-b border-amber-100">
+                    {rNotes.map(n=>(
+                      <div key={n.id} className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <p className="text-xs font-medium text-amber-800">{n.message}</p>
+                            {n.blocksBooking&&<span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded-full">חוסם שיבוצים</span>}
+                          </div>
+                          <p className="text-xs text-amber-600">
+                            {new Date(n.startDate).toLocaleDateString('he-IL')} – {new Date(n.endDate).toLocaleDateString('he-IL')}
+                            {n.startHour!=null&&n.endHour!=null&&` · ${n.startHour}:00–${n.endHour}:00`}
+                          </p>
+                        </div>
+                        <button onClick={()=>removeNote(n.id)} className="text-amber-400 hover:text-red-500 transition-colors shrink-0 p-0.5"><X size={14}/></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -535,7 +746,7 @@ export default function AdminPage(){
                         {daySlots.map((s,i)=>(
                           <div key={s.id}>
                             <div className="px-4 py-2 border-b border-gray-100 bg-green-50 flex items-center justify-between">
-                              <span className="font-semibold text-green-700 text-sm">{i===0?formatDateHe(ds):''}</span>
+                              <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
                               <div className="flex gap-1.5 shrink-0">
                                 <button onClick={()=>openEditSlot(s)} className="flex items-center gap-1 text-xs font-medium text-green-600 hover:bg-green-100 border border-green-200 rounded-lg px-2.5 py-1.5 transition-colors"><Pencil size={13}/> עריכה</button>
                                 <button onClick={()=>delSlot(s)} className="flex items-center gap-1 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors"><Trash2 size={13}/> מחיקה</button>

@@ -26,6 +26,7 @@ export const getRooms = () => api.get('/rooms').then((r) => r.data);
 export const addRoom = (name) => api.post('/rooms', { name }).then((r) => r.data);
 export const updateRoom = (id, name) => api.patch(`/rooms/${id}`, { name }).then((r) => r.data);
 export const deleteRoom = (id) => api.delete(`/rooms/${id}`).then((r) => r.data);
+export const reorderRooms = (ids) => api.post('/rooms/reorder', { ids }).then((r) => r.data);
 
 // Therapists
 export const getTherapists = () => api.get('/therapists').then((r) => r.data);
@@ -57,6 +58,12 @@ export const clearSlot = (id, scope = 'single') =>
 export const bookRecurring = (data) => api.post('/recurring', data).then((r) => r.data);
 export const updateRecurring = (id, data) => api.patch(`/recurring/${id}`, data).then((r) => r.data);
 export const deleteRecurring = (id) => api.delete(`/recurring/${id}`).then((r) => r.data);
+
+// Room Notes
+export const getRoomNotes = (roomId) =>
+  api.get('/room-notes', { params: roomId != null ? { roomId } : {} }).then((r) => r.data);
+export const addRoomNote = (data) => api.post('/room-notes', data).then((r) => r.data);
+export const deleteRoomNote = (id) => api.delete(`/room-notes/${id}`).then((r) => r.data);
 
 // Admin
 export const verifyAdmin = (password) =>

@@ -57,6 +57,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/room-notes"
+  to = "/.netlify/functions/room-notes"
+  status = 200
+
+[[redirects]]
+  from = "/api/room-notes/*"
+  to = "/.netlify/functions/room-notes/:splat"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

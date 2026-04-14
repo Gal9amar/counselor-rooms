@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getRooms, getTherapists, getSchedule, bookSlot, bookRecurring, clearSlot } from '../services/api';
+import { getRooms, getTherapists, getSchedule, bookSlot, bookRecurring, clearSlot, getRoomNotes } from '../services/api';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, X, Repeat2, AlertTriangle, Trash2 } from 'lucide-react';
 
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -17,7 +17,7 @@ function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).pa
 function hLabel(h) { return `${h}:00`; }
 function formatDateHe(ds) { const d = new Date(ds + 'T00:00:00'); return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`; }
 
-function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate }) {
+function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blockedDates, partialBlockedDates }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startPad = new Date(year, month, 1).getDay();
@@ -38,17 +38,24 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate }) {
           const isToday = ds === toDateStr(today);
           const isSelected = ds === selectedDate;
           const hasSlot = slotDates.has(ds);
+          const isBlocked = blockedDates?.has(ds);
+          const isPartialBlocked = !isBlocked && partialBlockedDates?.has(ds);
           return (
-            <button key={ds} disabled={isPast} onClick={() => !isPast && onSelectDate(ds)}
+            <button key={ds} disabled={isPast || isBlocked} onClick={() => !isPast && !isBlocked && onSelectDate(ds)}
+              title={isBlocked ? 'חדר חסום' : isPartialBlocked ? 'חלק מהשעות חסומות' : ''}
               className={`relative rounded-xl py-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5 ${
                 isSelected ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                : isBlocked ? 'bg-red-100 text-red-400 border border-red-200 cursor-not-allowed'
                 : isToday ? 'bg-green-100 text-green-700 font-bold ring-1 ring-green-300'
                 : isPast ? 'text-gray-200 cursor-not-allowed'
+                : isPartialBlocked ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
                 : hasSlot ? 'bg-green-50 text-green-700 border border-green-200'
                 : 'text-gray-500 hover:bg-gray-50'
               }`}>
               {day}
-              {hasSlot && !isPast && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-green-400'}`} />}
+              {isBlocked && <span className="text-xs leading-none">🚫</span>}
+              {isPartialBlocked && !isBlocked && <span className="text-xs leading-none">⚠️</span>}
+              {hasSlot && !isPast && !isBlocked && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-green-400'}`} />}
             </button>
           );
         })}
@@ -152,7 +159,8 @@ export default function SchedulePage() {
   const [recurOccurrences, setRecurOccurrences] = useState(10);
   const [recurEndDate, setRecurEndDate] = useState('');
   const [conflictModal, setConflictModal] = useState(null); // array of conflicts or null
-  const [deleteModal, setDeleteModal] = useState(null); // slot to delete or null
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [blockingNotes, setBlockingNotes] = useState([]); // notes for selected room
 
   useEffect(() => {
     const _today = new Date();
@@ -177,8 +185,12 @@ export default function SchedulePage() {
 
   const handleSelectRoom = async (room) => {
     setSelectedRoom(room); setStep('date'); setSelectedDate(null);
-    const s = await getSchedule({ roomId: room.id, from: `${currentYear}-01-01`, to: `${currentYear}-12-31` });
+    const [s, notes] = await Promise.all([
+      getSchedule({ roomId: room.id, from: `${currentYear}-01-01`, to: `${currentYear}-12-31` }),
+      getRoomNotes(room.id),
+    ]);
     setAllSlots(s);
+    setBlockingNotes(notes.filter(n => n.blocksBooking));
   };
   const handleSelectDate = async (ds) => {
     setSelectedDate(ds); setStep('hour'); setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false);
@@ -210,6 +222,37 @@ export default function SchedulePage() {
   const monthsToShow = useMemo(() => filterMonth !== null ? [filterMonth] : Array.from({ length: 12 }, (_, i) => i), [filterMonth]);
   const occupiedHours = new Set();
   daySlots.forEach(s => { for (let h = s.startHour; h < s.endHour; h++) occupiedHours.add(h); });
+
+  // Compute blocked/partial-blocked dates from blocking notes
+  const { blockedDates, partialBlockedDates } = useMemo(() => {
+    const blocked = new Set();
+    const partial = new Set();
+    blockingNotes.forEach(n => {
+      const start = new Date(n.startDate); start.setHours(0,0,0,0);
+      const end = new Date(n.endDate); end.setHours(0,0,0,0);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const ds = toDateStr(new Date(d));
+        if (n.startHour == null) blocked.add(ds);
+        else partial.add(ds);
+      }
+    });
+    return { blockedDates: blocked, partialBlockedDates: partial };
+  }, [blockingNotes]);
+
+  // Blocked hours for selected date
+  const blockedHoursForDate = useMemo(() => {
+    if (!selectedDate) return new Set();
+    const s = new Set();
+    blockingNotes.forEach(n => {
+      if (n.startHour == null) return; // full-day — whole day is blocked at calendar level
+      const start = new Date(n.startDate); start.setHours(0,0,0,0);
+      const end = new Date(n.endDate); end.setHours(0,0,0,0);
+      const sel = new Date(selectedDate + 'T00:00:00');
+      if (sel < start || sel > end) return;
+      for (let h = n.startHour; h < n.endHour; h++) s.add(h);
+    });
+    return s;
+  }, [blockingNotes, selectedDate]);
 
   const handleBook = async () => {
     const end = parseInt(endHour);
@@ -394,7 +437,7 @@ export default function SchedulePage() {
               return (
                 <div key={month} className="card rounded-2xl p-4">
                   <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">{MONTHS_HE[month]} {filterYear}</h3>
-                  <MonthCalendar year={filterYear} month={month} onSelectDate={handleSelectDate} slotDates={slotDates} selectedDate={selectedDate} />
+                  <MonthCalendar year={filterYear} month={month} onSelectDate={handleSelectDate} slotDates={slotDates} selectedDate={selectedDate} blockedDates={blockedDates} partialBlockedDates={partialBlockedDates} />
                 </div>
               );
             })}
@@ -408,22 +451,32 @@ export default function SchedulePage() {
           <h1 className="section-title mb-1">{selectedRoom.name}</h1>
           <p className="text-green-600 font-medium text-sm mb-5">{formatDateHe(selectedDate)}</p>
           <p className="text-gray-500 text-sm mb-3">בחר שעת התחלה</p>
+          {blockedHoursForDate.size > 0 && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-4 text-sm text-red-700">
+              <span>🚫</span>
+              <span>חלק מהשעות חסומות בתאריך זה</span>
+            </div>
+          )}
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mb-6">
             {ALL_HOURS.map(h => {
               const occupied = occupiedHours.has(h);
+              const isBlocked = blockedHoursForDate.has(h);
               const isSelected = startHour === h;
               const occupant = daySlots.find(s => h >= s.startHour && h < s.endHour);
+              const blockNote = isBlocked ? blockingNotes.find(n => n.startHour != null && h >= n.startHour && h < n.endHour) : null;
               return (
-                <button key={h} disabled={occupied} type="button"
-                  onClick={() => { if (occupied) return; setStartHour(h); setEndHour(''); setBookError(''); }}
-                  title={occupied ? occupant?.therapist?.name : ''}
+                <button key={h} disabled={occupied || isBlocked} type="button"
+                  onClick={() => { if (occupied || isBlocked) return; setStartHour(h); setEndHour(''); setBookError(''); }}
+                  title={isBlocked ? blockNote?.message || 'חסום' : occupied ? occupant?.therapist?.name : ''}
                   className={`hour-btn rounded-xl py-3 text-sm font-medium border ${
                     isSelected ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-200'
+                    : isBlocked ? 'bg-red-100 text-red-400 border-red-200 cursor-not-allowed'
                     : occupied ? 'bg-gray-100 text-gray-300 border-gray-100 cursor-not-allowed'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700 hover:bg-green-50'
                   }`}>
                   {hLabel(h)}
-                  {occupied && <div className="text-xs truncate px-1 text-gray-300 mt-0.5">{occupant?.therapist?.name?.split(' ')[0]}</div>}
+                  {isBlocked && <div className="text-xs mt-0.5">🚫</div>}
+                  {!isBlocked && occupied && <div className="text-xs truncate px-1 text-gray-300 mt-0.5">{occupant?.therapist?.name?.split(' ')[0]}</div>}
                 </button>
               );
             })}

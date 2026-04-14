@@ -44,6 +44,23 @@ exports.handler = async (event) => {
         return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
 
       const dateUTC = toMidnightUTC(date);
+
+      // Check blocking room notes
+      const blockingNote = await prisma.roomNote.findFirst({
+        where: {
+          roomId,
+          blocksBooking: true,
+          startDate: { lte: dateUTC },
+          endDate: { gte: dateUTC },
+          OR: [
+            { startHour: null },
+            { AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
+          ],
+        },
+      });
+      if (blockingNote)
+        return err(`החדר חסום: ${blockingNote.message}`, 409);
+
       const overlapping = await prisma.scheduleSlot.findFirst({
         where: { roomId, date: dateUTC, AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
         include: { therapist: true },
