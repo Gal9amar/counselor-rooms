@@ -72,7 +72,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   return (
     <LoadingContext.Provider value={{ loading, setLoading }}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <LoadingOverlay />
         <Routes>
           <Route element={<Layout />}>
