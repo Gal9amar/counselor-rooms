@@ -60,3 +60,8 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[dev]
+  command = "npm run dev --prefix client"
+  targetPort = 5173
+  autoLaunch = false

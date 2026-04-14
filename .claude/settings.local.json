@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netlify --version)",
+      "Bash(where netlify:*)",
+      "Bash(node -e \"require\\('./node_modules/.prisma/client/index.js'\\)\")",
+      "Bash(netlify status:*)",
+      "Bash(netlify login:*)",
+      "Bash(netlify sites:list)",
+      "Bash(netlify link:*)",
+      "Bash(netlify sites:search treatment)",
+      "Bash(netlify sites:list --json)",
+      "Bash(python3 -c \"import json,sys; sites=json.load\\(sys.stdin\\); [print\\(s['site_id'], s['name'], s.get\\('ssl_url',''\\)\\) for s in sites if 'counselor' in s.get\\('build_settings',{}\\).get\\('repo_path',''\\)]\")",
+      "Bash(netlify env:list)",
+      "Bash(netlify env:get DATABASE_URL)",
+      "Bash(netlify env:get DIRECT_URL)",
+      "Bash(netlify env:get ADMIN_PASSWORD)",
+      "Bash(netlify env:get DIRECT_URL --context production)",
+      "Bash(npx prisma:*)"
+    ]
+  }
+}

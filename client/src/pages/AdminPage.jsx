@@ -3,7 +3,7 @@ import {
   verifyAdmin, setAdminPassword,
   getRooms, addRoom, updateRoom, deleteRoom,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
-  getSchedule, updateSlot, clearSlot, updateRecurring,
+  getSchedule, updateSlot, clearSlot, updateRecurring, deleteRecurring,
 } from '../services/api';
 import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays } from 'lucide-react';
 
@@ -42,76 +42,25 @@ function EditableRow({item,onRename,onDelete,placeholder}){
       ):(
         <>
           <span className="flex-1 font-medium text-gray-700">{item.name}</span>
-          <button onClick={()=>setEditing(true)} className="text-gray-300 hover:text-green-500 p-1 transition-colors"><Pencil size={15}/></button>
-          <button onClick={()=>onDelete(item.id)} className="text-gray-300 hover:text-red-400 p-1 transition-colors"><Trash2 size={16}/></button>
+          <button onClick={()=>setEditing(true)} className="flex items-center gap-1 text-xs font-medium text-green-600 hover:bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 transition-colors"><Pencil size={13}/> עריכה</button>
+          <button onClick={()=>onDelete(item.id)} className="flex items-center gap-1 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors"><Trash2 size={13}/> מחיקה</button>
         </>
       )}
     </div>
   );
 }
 
-function SlotRow({slot,therapists,rooms,onSave,onDelete}){
-  const [editing,setEditing]=useState(false);
-  const [sh,setSh]=useState(slot.startHour);
-  const [eh,setEh]=useState(slot.endHour);
-  const [tid,setTid]=useState(slot.therapistId);
-  const [rid,setRid]=useState(slot.roomId);
-  const [dt,setDt]=useState(toDateStr(new Date(slot.date)));
-  const [nt,setNt]=useState(slot.note||'');
-  const [saving,setSaving]=useState(false);
-  const [err,setErr]=useState('');
-  const save=async()=>{
-    if(eh<=sh){setErr('סיום אחרי התחלה');return;}
-    setSaving(true);setErr('');
-    try{await onSave(slot.id,sh,eh,tid,nt.trim()||null,rid,dt);setEditing(false);}
-    catch(e){setErr(e.response?.data?.error||'שגיאה');}
-    finally{setSaving(false);}
-  };
-  const cancel=()=>{setSh(slot.startHour);setEh(slot.endHour);setTid(slot.therapistId);setRid(slot.roomId);setDt(toDateStr(new Date(slot.date)));setNt(slot.note||'');setErr('');setEditing(false);};
+function SlotRow({slot}){
   return(
-    <div className="px-4 py-3 border-b border-gray-100 last:border-0">
-      {editing?(
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2 items-center">
-            <select className="input py-1.5 text-sm w-auto" value={rid} onChange={e=>setRid(parseInt(e.target.value))}>
-              {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-            <input type="date" dir="ltr" className="input py-1.5 text-sm w-auto" value={dt} onChange={e=>setDt(e.target.value)}/>
-            <select className="input py-1.5 text-sm w-auto" value={sh} onChange={e=>setSh(parseInt(e.target.value))}>
-              {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
-            </select>
-            <span className="text-gray-300">–</span>
-            <select className="input py-1.5 text-sm w-auto" value={eh} onChange={e=>setEh(parseInt(e.target.value))}>
-              {ALL_HOURS.filter(h=>h>sh).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
-            </select>
-            <select className="input py-1.5 text-sm w-auto" value={tid} onChange={e=>setTid(parseInt(e.target.value))}>
-              {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <button onClick={save} disabled={saving} className="text-green-500 hover:text-green-600 p-1"><Check size={18}/></button>
-            <button onClick={cancel} className="text-gray-300 hover:text-gray-500 p-1"><X size={18}/></button>
-          </div>
-          <input className="input py-1.5 text-sm w-full" placeholder="הערה (לא חובה)" value={nt}
-            onChange={e=>setNt(e.target.value)} maxLength={200}/>
-          {err&&<p className="text-red-500 text-xs">{err}</p>}
-        </div>
-      ):(
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-gray-700">{slot.therapist.name}</span>
-              <span className="text-sm text-gray-400">{hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
-            </div>
-            {slot.note && (
-              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-start gap-1">
-                <span className="shrink-0">📝</span>{slot.note}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <button onClick={()=>setEditing(true)} className="text-gray-300 hover:text-green-500 p-1 transition-colors"><Pencil size={14}/></button>
-            <button onClick={()=>onDelete(slot)} className="text-gray-300 hover:text-red-400 p-1 transition-colors"><Trash2 size={14}/></button>
-          </div>
-        </div>
+    <div className="px-4 py-2.5 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-medium text-gray-700">{slot.therapist.name}</span>
+        <span className="text-sm text-gray-400">{hLabel(slot.startHour)}–{hLabel(slot.endHour)}</span>
+      </div>
+      {slot.note && (
+        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-start gap-1">
+          <span className="shrink-0">📝</span>{slot.note}
+        </p>
       )}
     </div>
   );
@@ -179,16 +128,26 @@ export default function AdminPage(){
 
   const openEditRecurring=(rid,seriesSlots)=>{
     const first=seriesSlots[0];
-    setEditRecurring({rid:parseInt(rid),roomId:first.roomId,therapistId:first.therapistId,startHour:first.startHour,endHour:first.endHour,note:first.note||''});
+    const sorted=[...seriesSlots].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const startDate=first.recurring?.startDate
+      ?toDateStr(new Date(first.recurring.startDate))
+      :toDateStr(new Date(sorted[0].date));
+    setEditRecurring({rid:parseInt(rid),roomId:first.roomId,therapistId:first.therapistId,startHour:first.startHour,endHour:first.endHour,note:first.note||'',startDate});
     setEditRecurringErr('');
   };
   const saveRecurring=async()=>{
-    const {rid,roomId,therapistId,startHour,endHour,note}=editRecurring;
+    const {rid,roomId,therapistId,startHour,endHour,note,startDate}=editRecurring;
     if(endHour<=startHour){setEditRecurringErr('סיום אחרי התחלה');return;}
     setEditRecurringSaving(true);setEditRecurringErr('');
     try{
-      const updated=await updateRecurring(rid,{roomId,therapistId,startHour,endHour,note:note||null});
-      setSlots(p=>p.map(s=>s.recurringId===rid?updated.find(u=>u.id===s.id)||s:s));
+      const updated=await updateRecurring(rid,{roomId,therapistId,startHour,endHour,note:note||null,startDate});
+      setSlots(p=>{
+        const updatedIds=new Set(updated.map(u=>u.id));
+        const oldRecurring=p.filter(s=>s.recurringId===rid);
+        const keptOther=p.filter(s=>s.recurringId!==rid);
+        // replace entire series with updated (handles date regeneration)
+        return [...keptOther,...updated];
+      });
       setEditRecurring(null);
     }catch(e){
       const data=e.response?.data?.error;
@@ -197,10 +156,37 @@ export default function AdminPage(){
     }finally{setEditRecurringSaving(false);}
   };
 
+  const handleDeleteRecurring=async(rid)=>{
+    if(!confirm('למחוק את כל השיבוצים בסדרה זו?'))return;
+    try{
+      await deleteRecurring(parseInt(rid));
+      setSlots(p=>p.filter(s=>s.recurringId!==parseInt(rid)));
+    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+
   const [deleteModal,setDeleteModal]=useState(null);
-  const [editRecurring,setEditRecurring]=useState(null); // {rid, roomId, therapistId, startHour, endHour, note}
+  const [editRecurring,setEditRecurring]=useState(null);
   const [editRecurringErr,setEditRecurringErr]=useState('');
   const [editRecurringSaving,setEditRecurringSaving]=useState(false);
+  const [editSlot,setEditSlot]=useState(null); // {id,roomId,date,startHour,endHour,therapistId,note}
+  const [editSlotErr,setEditSlotErr]=useState('');
+  const [editSlotSaving,setEditSlotSaving]=useState(false);
+
+  const openEditSlot=(slot)=>{
+    setEditSlot({id:slot.id,roomId:slot.roomId,date:toDateStr(new Date(slot.date)),startHour:slot.startHour,endHour:slot.endHour,therapistId:slot.therapistId,note:slot.note||''});
+    setEditSlotErr('');
+  };
+  const saveEditSlot=async()=>{
+    const {id,roomId,date,startHour,endHour,therapistId,note}=editSlot;
+    if(endHour<=startHour){setEditSlotErr('סיום אחרי התחלה');return;}
+    setEditSlotSaving(true);setEditSlotErr('');
+    try{
+      const updated=await updateSlot(id,startHour,endHour,therapistId,note||null,roomId,date);
+      setSlots(p=>p.map(s=>s.id===id?{...s,...updated}:s));
+      setEditSlot(null);
+    }catch(e){setEditSlotErr(e.response?.data?.error||'שגיאה');}
+    finally{setEditSlotSaving(false);}
+  };
 
   const delSlot=async(slot)=>{
     if(slot.recurringId){setDeleteModal(slot);return;}
@@ -277,7 +263,7 @@ export default function AdminPage(){
   const tabs=[{id:'rooms',label:'חדרים'},{id:'therapists',label:'מטפלים'},{id:'schedule',label:'שיבוצים'}];
 
   return(
-    <div className="fade-up">
+    <>
       {editRecurring&&(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setEditRecurring(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
@@ -286,6 +272,11 @@ export default function AdminPage(){
               <button onClick={()=>setEditRecurring(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
             </div>
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">תאריך התחלה</label>
+                <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.startDate}
+                  onChange={e=>setEditRecurring(p=>({...p,startDate:e.target.value}))}/>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">חדר</label>
                 <select className="input py-2 text-sm" value={editRecurring.roomId} onChange={e=>setEditRecurring(p=>({...p,roomId:parseInt(e.target.value)}))}>
@@ -328,6 +319,61 @@ export default function AdminPage(){
           </div>
         </div>
       )}
+      {editSlot&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setEditSlot(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2"><Pencil size={16} className="text-green-500"/> עריכת שיבוץ</h3>
+              <button onClick={()=>setEditSlot(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">תאריך</label>
+                <input type="date" dir="ltr" className="input py-2 text-sm" value={editSlot.date}
+                  onChange={e=>setEditSlot(p=>({...p,date:e.target.value}))}/>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">חדר</label>
+                <select className="input py-2 text-sm" value={editSlot.roomId} onChange={e=>setEditSlot(p=>({...p,roomId:parseInt(e.target.value)}))}>
+                  {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">מטפל</label>
+                <select className="input py-2 text-sm" value={editSlot.therapistId} onChange={e=>setEditSlot(p=>({...p,therapistId:parseInt(e.target.value)}))}>
+                  {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת התחלה</label>
+                  <select className="input py-2 text-sm" value={editSlot.startHour} onChange={e=>setEditSlot(p=>({...p,startHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת סיום</label>
+                  <select className="input py-2 text-sm" value={editSlot.endHour} onChange={e=>setEditSlot(p=>({...p,endHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.filter(h=>h>editSlot.startHour).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">הערה</label>
+                <input className="input py-2 text-sm" placeholder="הערה (לא חובה)" value={editSlot.note}
+                  onChange={e=>setEditSlot(p=>({...p,note:e.target.value}))} maxLength={200}/>
+              </div>
+              {editSlotErr&&<p className="text-red-500 text-xs">{editSlotErr}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={saveEditSlot} disabled={editSlotSaving} className="btn-primary flex-1 py-2.5 text-sm">
+                  {editSlotSaving?'שומר...':'שמור שינויים'}
+                </button>
+                <button onClick={()=>setEditSlot(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteModal&&(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setDeleteModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
@@ -344,6 +390,7 @@ export default function AdminPage(){
           </div>
         </div>
       )}
+      <div className="fade-up">
       <div className="flex items-center justify-between mb-8">
         <h1 className="section-title">פאנל מנהל</h1>
         <button onClick={()=>{sessionStorage.removeItem('adminPass');setAuthed(false);}} className="btn-ghost text-sm px-3 py-1.5">יציאה</button>
@@ -459,9 +506,9 @@ export default function AdminPage(){
                               <RefreshCw size={12} className="shrink-0"/>
                               {firstDate} → {lastDate}
                             </span>
-                            <div className="flex gap-1 shrink-0">
-                              <button onClick={()=>openEditRecurring(rid,series)} className="text-gray-300 hover:text-blue-500 transition-colors p-1"><Pencil size={14}/></button>
-                              <button onClick={()=>handleDeleteRecurring(rid)} className="text-gray-300 hover:text-red-400 transition-colors p-1"><Trash2 size={14}/></button>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button onClick={()=>openEditRecurring(rid,series)} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg px-2.5 py-1.5 transition-colors"><Pencil size={13}/> עריכה</button>
+                              <button onClick={()=>handleDeleteRecurring(rid)} className="flex items-center gap-1 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors"><Trash2 size={13}/> מחיקה</button>
                             </div>
                           </div>
                           {/* Details row */}
@@ -481,16 +528,25 @@ export default function AdminPage(){
                         </div>
                       );
                     })}
-                    {sortedDates.map(ds=>(
+                    {sortedDates.map(ds=>{
+                      const daySlots=slotsByRoom[rId][ds].sort((a,b)=>a.startHour-b.startHour);
+                      return(
                       <div key={ds}>
-                        <div className="px-4 py-2 border-b border-gray-100 bg-green-50">
-                          <span className="font-semibold text-green-700 text-sm">{formatDateHe(ds)}</span>
-                        </div>
-                        {slotsByRoom[rId][ds].sort((a,b)=>a.startHour-b.startHour).map(s=>(
-                      <SlotRow key={s.id} slot={s} therapists={therapists} rooms={rooms} onSave={saveSlot} onDelete={()=>delSlot(s)}/>
+                        {daySlots.map((s,i)=>(
+                          <div key={s.id}>
+                            <div className="px-4 py-2 border-b border-gray-100 bg-green-50 flex items-center justify-between">
+                              <span className="font-semibold text-green-700 text-sm">{i===0?formatDateHe(ds):''}</span>
+                              <div className="flex gap-1.5 shrink-0">
+                                <button onClick={()=>openEditSlot(s)} className="flex items-center gap-1 text-xs font-medium text-green-600 hover:bg-green-100 border border-green-200 rounded-lg px-2.5 py-1.5 transition-colors"><Pencil size={13}/> עריכה</button>
+                                <button onClick={()=>delSlot(s)} className="flex items-center gap-1 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors"><Trash2 size={13}/> מחיקה</button>
+                              </div>
+                            </div>
+                            <SlotRow slot={s}/>
+                          </div>
                         ))}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   );
                 })}
@@ -503,6 +559,7 @@ export default function AdminPage(){
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
