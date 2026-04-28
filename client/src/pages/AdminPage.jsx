@@ -6,7 +6,7 @@ import {
   getSchedule, updateSlot, clearSlot, updateRecurring, deleteRecurring,
   getRoomNotes, addRoomNote, deleteRoomNote,
 } from '../services/api';
-import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays, GripVertical, MessageSquarePlus, AlertTriangle } from 'lucide-react';
+import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays, GripVertical, MessageSquarePlus, AlertTriangle, ListChecks } from 'lucide-react';
 
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
@@ -67,6 +67,57 @@ function SlotRow({slot}){
         <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1 mt-1 flex items-start gap-1">
           <span className="shrink-0">📝</span>{slot.note}
         </p>
+      )}
+    </div>
+  );
+}
+
+function MonthsDropdown({filterMonths,onChange}){
+  const [open,setOpen]=useState(false);
+  const ref=React.useRef(null);
+  useEffect(()=>{
+    const handler=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    document.addEventListener('mousedown',handler);
+    return()=>document.removeEventListener('mousedown',handler);
+  },[]);
+  const toggle=i=>{
+    const next=filterMonths.includes(i)?filterMonths.filter(m=>m!==i):[...filterMonths,i];
+    if(next.length===0)return;
+    onChange(next);
+  };
+  const label=filterMonths.length===12?'כל החודשים':
+    filterMonths.length===1?MONTHS_HE[filterMonths[0]]:
+    `${filterMonths.length} חודשים`;
+  return(
+    <div ref={ref} className="relative">
+      <button type="button"
+        onClick={()=>setOpen(p=>!p)}
+        className={`input py-2 pr-3 pl-8 text-sm flex items-center gap-2 cursor-pointer text-right ${open?'border-green-400 ring-2 ring-green-100':''}`}
+        style={{minWidth:'140px'}}>
+        <span className="flex-1 text-right">{label}</span>
+        <span className="text-gray-400 text-xs absolute left-2.5 top-1/2 -translate-y-1/2">{open?'▲':'▼'}</span>
+      </button>
+      {open&&(
+        <div className="absolute top-full mt-1 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-[200px]">
+          <div className="grid grid-cols-3 gap-1">
+            {MONTHS_HE.map((name,i)=>{
+              const sel=filterMonths.includes(i);
+              return(
+                <button key={i} type="button"
+                  onClick={()=>toggle(i)}
+                  className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all text-center ${
+                    sel?'bg-green-500 text-white':'bg-gray-50 text-gray-600 hover:bg-green-50 hover:text-green-700'
+                  }`}>{name}</button>
+              );
+            })}
+          </div>
+          <div className="flex gap-1 mt-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={()=>onChange(MONTHS_HE.map((_,i)=>i))}
+              className="flex-1 text-xs text-green-600 hover:bg-green-50 py-1 rounded-lg transition-colors">הכל</button>
+            <button type="button" onClick={()=>onChange([new Date().getMonth()])}
+              className="flex-1 text-xs text-gray-500 hover:bg-gray-50 py-1 rounded-lg transition-colors">החודש</button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -226,6 +277,42 @@ export default function AdminPage(){
   const [editRecurring,setEditRecurring]=useState(null);
   const [editRecurringErr,setEditRecurringErr]=useState('');
   const [editRecurringSaving,setEditRecurringSaving]=useState(false);
+  const [manageDaysModal,setManageDaysModal]=useState(null); // {rid, series}
+  const [manageDaysSelected,setManageDaysSelected]=useState(new Set());
+  const [manageDaysDeleting,setManageDaysDeleting]=useState(false);
+
+  const openManageDays=(rid,series,editRecurringSnapshot=null)=>{
+    const sorted=[...series].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    setManageDaysModal({rid:parseInt(rid),series:sorted,editRecurringSnapshot});
+    setManageDaysSelected(new Set());
+  };
+  const toggleDaySelect=(id)=>{
+    setManageDaysSelected(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  };
+  const toggleSelectAll=()=>{
+    if(!manageDaysModal)return;
+    if(manageDaysSelected.size===manageDaysModal.series.length)
+      setManageDaysSelected(new Set());
+    else
+      setManageDaysSelected(new Set(manageDaysModal.series.map(s=>s.id)));
+  };
+  const deleteSelectedDays=async()=>{
+    if(!manageDaysModal||manageDaysSelected.size===0)return;
+    if(manageDaysSelected.size===manageDaysModal.series.length){
+      if(!confirm('למחוק את כל הסדרה?'))return;
+    }
+    setManageDaysDeleting(true);
+    try{
+      for(const id of manageDaysSelected){
+        await clearSlot(id,'single');
+      }
+      const deletedIds=new Set(manageDaysSelected);
+      setSlots(p=>p.filter(s=>!deletedIds.has(s.id)));
+      setManageDaysModal(prev=>({...prev,series:prev.series.filter(s=>!deletedIds.has(s.id))}));
+      setManageDaysSelected(new Set());
+    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+    finally{setManageDaysDeleting(false);}
+  };
   const [editSlot,setEditSlot]=useState(null); // {id,roomId,date,startHour,endHour,therapistId,note}
   const [editSlotErr,setEditSlotErr]=useState('');
   const [editSlotSaving,setEditSlotSaving]=useState(false);
@@ -437,6 +524,17 @@ export default function AdminPage(){
                 <input className="input py-2 text-sm" placeholder="הערה (לא חובה)" value={editRecurring.note}
                   onChange={e=>setEditRecurring(p=>({...p,note:e.target.value}))} maxLength={200}/>
               </div>
+              {/* Manage days button */}
+              <button type="button"
+                onClick={()=>{
+                  const series=slots.filter(s=>s.recurringId===editRecurring.rid);
+                  const snapshot={...editRecurring};
+                  setEditRecurring(null);
+                  openManageDays(editRecurring.rid,series,snapshot);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors">
+                <ListChecks size={15}/> ניהול ימים בסדרה
+              </button>
               {editRecurringErr&&<p className="text-red-500 text-xs">{editRecurringErr}</p>}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveRecurring} disabled={editRecurringSaving} className="btn-primary flex-1 py-2.5 text-sm">
@@ -444,6 +542,98 @@ export default function AdminPage(){
                 </button>
                 <button onClick={()=>setEditRecurring(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {manageDaysModal&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>{if(manageDaysModal?.editRecurringSnapshot)setEditRecurring(manageDaysModal.editRecurringSnapshot);setManageDaysModal(null);}}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[85vh]" onClick={e=>e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <ListChecks size={16} className="text-blue-500"/> ניהול ימים בסדרה
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">{manageDaysModal.series.length} ימים בסדרה</p>
+              </div>
+              <button onClick={()=>{if(manageDaysModal?.editRecurringSnapshot)setEditRecurring(manageDaysModal.editRecurringSnapshot);setManageDaysModal(null);}} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+              <button type="button" onClick={toggleSelectAll}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors">
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                  manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0
+                    ?'bg-blue-500 border-blue-500':'border-gray-300 bg-white'
+                }`}>
+                  {manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0&&
+                    <Check size={10} className="text-white"/>}
+                </div>
+                {manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0?'בטל הכל':'בחר הכל'}
+              </button>
+              {manageDaysSelected.size>0&&(
+                <button type="button" onClick={deleteSelectedDays} disabled={manageDaysDeleting}
+                  className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50">
+                  <Trash2 size={13}/>
+                  {manageDaysDeleting?'מוחק...': `מחק ${manageDaysSelected.size} ${manageDaysSelected.size===1?'יום':'ימים'}`}
+                </button>
+              )}
+            </div>
+            {/* List */}
+            <div className="overflow-y-auto flex-1">
+              {manageDaysModal.series.length===0?(
+                <p className="text-center text-gray-400 text-sm py-10">אין ימים בסדרה</p>
+              ):(
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white border-b border-gray-100">
+                    <tr>
+                      <th className="w-10 py-2 px-3"></th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">תאריך</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">יום</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">שעות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manageDaysModal.series.map((s,i)=>{
+                      const ds=toDateStr(new Date(s.date));
+                      const d=new Date(ds+'T00:00:00');
+                      const isPast=new Date(ds)<new Date(toDateStr(new Date()));
+                      const sel=manageDaysSelected.has(s.id);
+                      return(
+                        <tr key={s.id}
+                          onClick={()=>toggleDaySelect(s.id)}
+                          className={`border-b border-gray-50 cursor-pointer transition-colors ${
+                            sel?'bg-blue-50':'hover:bg-gray-50'
+                          }`}>
+                          <td className="py-2.5 px-3">
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                              sel?'bg-blue-500 border-blue-500':'border-gray-300 bg-white'
+                            }`}>
+                              {sel&&<Check size={10} className="text-white"/>}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`font-medium ${isPast?'text-gray-400':'text-gray-700'}`}>
+                              {d.getDate()} {MONTHS_HE[d.getMonth()]} {d.getFullYear()}
+                            </span>
+                            {isPast&&<span className="mr-1.5 text-xs text-gray-300">עבר</span>}
+                          </td>
+                          <td className="py-2.5 px-3 text-gray-500">{DAYS_HE[d.getDay()]}</td>
+                          <td className="py-2.5 px-3 text-gray-500 tabular-nums">{hLabel(s.startHour)}–{hLabel(s.endHour)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                {manageDaysSelected.size>0?`${manageDaysSelected.size} נבחרו`:'לחץ על שורה לבחירה'}
+              </span>
+              <button onClick={()=>{if(manageDaysModal?.editRecurringSnapshot)setEditRecurring(manageDaysModal.editRecurringSnapshot);setManageDaysModal(null);}} className="btn-secondary px-4 py-2 text-sm">← חזור לעריכה</button>
             </div>
           </div>
         </div>
@@ -624,63 +814,42 @@ export default function AdminPage(){
 
       {/* Schedule filters — only shown on schedule tab */}
       {tab==='schedule'&&(
-        <div className="mb-5 space-y-3">
-          {/* Year selector */}
-          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 w-fit">
-            {[filterYear-1,filterYear,filterYear+1].map(y=>(
-              <button key={y}
-                onClick={()=>{setFilterYear(y);loadAll(y,filterMonths);}}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filterYear===y?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'
-                }`}>{y}</button>
-            ))}
+        <div className="mb-5">
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Year dropdown */}
+            <div className="relative">
+              <select
+                className="input py-2 pr-3 pl-8 text-sm appearance-none cursor-pointer w-28"
+                value={filterYear}
+                onChange={e=>{const y=parseInt(e.target.value);setFilterYear(y);loadAll(y,filterMonths);}}>
+                {[filterYear-2,filterYear-1,filterYear,filterYear+1,filterYear+2].map(y=>(
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
+            </div>
+            {/* Months multiselect dropdown */}
+            <MonthsDropdown
+              filterMonths={filterMonths}
+              onChange={next=>{setFilterMonths(next);loadAll(filterYear,next);}}
+            />
+            {/* Therapist dropdown */}
+            <div className="relative">
+              <select
+                className="input py-2 pr-3 pl-8 text-sm appearance-none cursor-pointer"
+                value={filterTherapistId??''}
+                onChange={e=>setFilterTherapistId(e.target.value===''?null:parseInt(e.target.value))}>
+                <option value="">כל המטפלים</option>
+                {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
+            </div>
+            <span className="text-xs text-gray-400 mr-1">
+              {filterTherapistId
+                ? slots.filter(s=>s.therapistId===filterTherapistId).length
+                : slots.length} שיבוצים
+            </span>
           </div>
-          {/* Month pills multi-select */}
-          <div className="flex flex-wrap gap-1.5">
-            {MONTHS_HE.map((name,i)=>{
-              const selected=filterMonths.includes(i);
-              return(
-                <button key={i}
-                  onClick={()=>{
-                    const next=selected
-                      ?filterMonths.filter(m=>m!==i)
-                      :[...filterMonths,i];
-                    if(next.length===0)return; // at least one month
-                    setFilterMonths(next);
-                    loadAll(filterYear,next);
-                  }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                    selected
-                      ?'bg-green-500 text-white border-green-500 shadow-sm'
-                      :'bg-white text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-700'
-                  }`}>{name}</button>
-              );
-            })}
-          </div>
-          {/* Therapist filter */}
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={()=>setFilterTherapistId(null)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                filterTherapistId===null
-                  ?'bg-gray-700 text-white border-gray-700 shadow-sm'
-                  :'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
-              }`}>הכל</button>
-            {therapists.map(t=>(
-              <button key={t.id}
-                onClick={()=>setFilterTherapistId(p=>p===t.id?null:t.id)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                  filterTherapistId===t.id
-                    ?'bg-gray-700 text-white border-gray-700 shadow-sm'
-                    :'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
-                }`}>{t.name}</button>
-            ))}
-          </div>
-          <span className="text-xs text-gray-400">
-            {filterTherapistId
-              ? slots.filter(s=>s.therapistId===filterTherapistId).length
-              : slots.length} שיבוצים
-          </span>
         </div>
       )}
 
