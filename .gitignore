@@ -1,21 +1,38 @@
+# Dependencies
 node_modules/
-.env
-dist/
-.DS_Store
+client/node_modules/
 
-# Local Netlify folder
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+client/dist/
+
+# Netlify
 .netlify
 
 # Lock files
 package-lock.json
+client/package-lock.json
 deno.lock
-
-# Build output
-client/dist/
 
 # Logs
 *.log
 npm-debug.log*
 
 # OS
+.DS_Store
 Thumbs.db
+
+# Prisma generated
+node_modules/.prisma/
+
+# Spec / planning docs (not needed in repo)
+COUNSELOR_ROOMS_SPEC.md
+SPEC.md
+
+# Setup scripts (local use only)
+setup.sh

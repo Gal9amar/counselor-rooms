@@ -161,25 +161,33 @@ export default function AdminPage(){
   const openEditRecurring=(rid,seriesSlots)=>{
     const first=seriesSlots[0];
     const sorted=[...seriesSlots].sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const startDate=first.recurring?.startDate
-      ?toDateStr(new Date(first.recurring.startDate))
-      :toDateStr(new Date(sorted[0].date));
-    setEditRecurring({rid:parseInt(rid),roomId:first.roomId,therapistId:first.therapistId,startHour:first.startHour,endHour:first.endHour,note:first.note||'',startDate});
+    const rec=first.recurring||{};
+    const startDate=rec.startDate?toDateStr(new Date(rec.startDate)):toDateStr(new Date(sorted[0].date));
+    const endDate=rec.endDate?toDateStr(new Date(rec.endDate)):'';
+    const occurrences=rec.occurrences||'';
+    const endMode=rec.endDate?'date':rec.occurrences?'occurrences':'date';
+    setEditRecurring({
+      rid:parseInt(rid),roomId:first.roomId,therapistId:first.therapistId,
+      startHour:first.startHour,endHour:first.endHour,note:first.note||'',
+      startDate,frequency:rec.frequency||'weekly',
+      daysOfWeek:rec.daysOfWeek||[],
+      endDate,occurrences,endMode,
+    });
     setEditRecurringErr('');
   };
   const saveRecurring=async()=>{
-    const {rid,roomId,therapistId,startHour,endHour,note,startDate}=editRecurring;
+    const {rid,roomId,therapistId,startHour,endHour,note,startDate,frequency,daysOfWeek,endDate,occurrences,endMode}=editRecurring;
     if(endHour<=startHour){setEditRecurringErr('סיום אחרי התחלה');return;}
+    if(frequency==='weekly'&&daysOfWeek.length===0){setEditRecurringErr('יש לבחור לפחות יום אחד');return;}
+    if(endMode==='date'&&!endDate){setEditRecurringErr('יש לבחור תאריך סיום');return;}
+    if(endMode==='occurrences'&&(!occurrences||parseInt(occurrences)<1)){setEditRecurringErr('יש להזין מספר חזרות');return;}
     setEditRecurringSaving(true);setEditRecurringErr('');
     try{
-      const updated=await updateRecurring(rid,{roomId,therapistId,startHour,endHour,note:note||null,startDate});
-      setSlots(p=>{
-        const updatedIds=new Set(updated.map(u=>u.id));
-        const oldRecurring=p.filter(s=>s.recurringId===rid);
-        const keptOther=p.filter(s=>s.recurringId!==rid);
-        // replace entire series with updated (handles date regeneration)
-        return [...keptOther,...updated];
-      });
+      const payload={roomId,therapistId,startHour,endHour,note:note||null,startDate,frequency,daysOfWeek,
+        endDate:endMode==='date'?endDate:null,
+        occurrences:endMode==='occurrences'?parseInt(occurrences):null};
+      const updated=await updateRecurring(rid,payload);
+      setSlots(p=>[...p.filter(s=>s.recurringId!==rid),...updated]);
       setEditRecurring(null);
     }catch(e){
       const data=e.response?.data?.error;
@@ -333,12 +341,8 @@ export default function AdminPage(){
               <h3 className="font-bold text-gray-800 flex items-center gap-2"><RefreshCw size={16} className="text-blue-500"/> עריכת סדרה חוזרת</h3>
               <button onClick={()=>setEditRecurring(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">תאריך התחלה</label>
-                <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.startDate}
-                  onChange={e=>setEditRecurring(p=>({...p,startDate:e.target.value}))}/>
-              </div>
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+              {/* Room + Therapist */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">חדר</label>
                 <select className="input py-2 text-sm" value={editRecurring.roomId} onChange={e=>setEditRecurring(p=>({...p,roomId:parseInt(e.target.value)}))}>
@@ -351,6 +355,7 @@ export default function AdminPage(){
                   {therapists.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
+              {/* Hours */}
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-500 mb-1">שעת התחלה</label>
@@ -365,6 +370,68 @@ export default function AdminPage(){
                   </select>
                 </div>
               </div>
+              {/* Frequency */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">תדירות</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {Object.entries(FREQ_HE).map(([k,v])=>(
+                    <button key={k} type="button"
+                      onClick={()=>setEditRecurring(p=>({...p,frequency:k,daysOfWeek:k==='weekly'?p.daysOfWeek:[]}))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                        editRecurring.frequency===k?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}>{v}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Days of week (only for weekly) */}
+              {editRecurring.frequency==='weekly'&&(
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">ימים בשבוע</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {DAYS_HE.map((d,i)=>{
+                      const sel=editRecurring.daysOfWeek.includes(i);
+                      return(
+                        <button key={i} type="button"
+                          onClick={()=>setEditRecurring(p=>({...p,daysOfWeek:sel?p.daysOfWeek.filter(x=>x!==i):[...p.daysOfWeek,i].sort()}))}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            sel?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                          }`}>{d}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Start date */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">תאריך התחלה</label>
+                <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.startDate}
+                  onChange={e=>setEditRecurring(p=>({...p,startDate:e.target.value}))}/>
+              </div>
+              {/* End mode */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">סיום</label>
+                <div className="flex gap-1.5 mb-2">
+                  <button type="button"
+                    onClick={()=>setEditRecurring(p=>({...p,endMode:'date'}))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editRecurring.endMode==='date'?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                    תאריך סיום
+                  </button>
+                  <button type="button"
+                    onClick={()=>setEditRecurring(p=>({...p,endMode:'occurrences'}))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editRecurring.endMode==='occurrences'?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                    מספר חזרות
+                  </button>
+                </div>
+                {editRecurring.endMode==='date'?(
+                  <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.endDate}
+                    onChange={e=>setEditRecurring(p=>({...p,endDate:e.target.value}))}/>
+                ):(
+                  <input type="number" min="1" max="500" className="input py-2 text-sm" placeholder="מספר חזרות"
+                    value={editRecurring.occurrences}
+                    onChange={e=>setEditRecurring(p=>({...p,occurrences:e.target.value}))}/>
+                )}
+              </div>
+              {/* Note */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">הערה</label>
                 <input className="input py-2 text-sm" placeholder="הערה (לא חובה)" value={editRecurring.note}
