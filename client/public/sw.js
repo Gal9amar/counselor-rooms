@@ -1,5 +1,5 @@
-const CACHE = 'treatment-rooms-v1';
-const STATIC = ['/','./index.html'];
+const CACHE = 'treatment-rooms-v2.0.0';
+const STATIC = ['/', './index.html'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
