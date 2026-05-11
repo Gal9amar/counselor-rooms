@@ -36,6 +36,7 @@ counselor-rooms/
 │       ├── schedule.js             ← GET/POST/PATCH/DELETE slots
 │       ├── recurring.js            ← ניהול תזמון חוזר
 │       ├── admin.js                ← POST verify admin password
+│       ├── room-notes.js           ← GET/POST/DELETE הערות לחדרים (RoomNote)
 │       └── lib/
 │           ├── prisma.js           ← Prisma singleton
 │           └── helpers.js          ← CORS, auth, response helpers
@@ -148,6 +149,17 @@ daysOfWeek: Int[]   // 0=ראשון ... 5=שישי
 startDate, endDate?, occurrences?
 ```
 
+**RoomNote**
+```prisma
+id: Int @id
+roomId: Int → Room (cascade delete)
+message: String
+startDate: DateTime (midnight UTC)
+endDate: DateTime (midnight UTC)
+startHour: Int?
+endHour: Int?
+```
+
 ### הערות חשובות
 - תאריכים נשמרים כ-**midnight UTC**
 - שעות כ-**integers** 8–21 (startHour), 9–22 (endHour)
@@ -191,6 +203,9 @@ ADMIN_PASSWORD="your-admin-password"
 | POST | `/recurring` | Public | יצירת תזמון חוזר |
 | PATCH | `/recurring/:id` | Admin | עדכון תזמון |
 | POST | `/admin/verify` | — | אימות סיסמת admin |
+| GET | `/room-notes?roomId=` | Public | הערות לחדר |
+| POST | `/room-notes` | Admin | יצירת הערה לחדר |
+| DELETE | `/room-notes/:id` | Admin | מחיקת הערה |
 
 **Admin Auth:** Header `x-admin-password: [ADMIN_PASSWORD]`
 

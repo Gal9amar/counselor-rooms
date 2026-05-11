@@ -11,11 +11,15 @@ function setGlobalLoading(val) {
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const api = axios.create({ baseURL: BASE_URL });
 
-api.interceptors.request.use(cfg => { setGlobalLoading(true); return cfg; });
+api.interceptors.request.use(cfg => { if (!cfg.silent) setGlobalLoading(true); return cfg; });
 api.interceptors.response.use(
-  res => { setGlobalLoading(false); return res; },
-  err => { setGlobalLoading(false); return Promise.reject(err); }
+  res => { if (!res.config.silent) setGlobalLoading(false); return res; },
+  err => { if (!err.config?.silent) setGlobalLoading(false); return Promise.reject(err); }
 );
+
+// Silent API instance — skips the global loading overlay
+const silentApi = axios.create({ baseURL: BASE_URL });
+silentApi.interceptors.request.use(cfg => { api.defaults.headers.common['x-admin-password'] && (cfg.headers['x-admin-password'] = api.defaults.headers.common['x-admin-password']); return cfg; });
 
 export const setAdminPassword = (password) => {
   api.defaults.headers.common['x-admin-password'] = password;
@@ -68,3 +72,15 @@ export const deleteRoomNote = (id) => api.delete(`/room-notes/${id}`).then((r) =
 // Admin
 export const verifyAdmin = (password) =>
   api.post('/admin/verify', { password }).then((r) => r.data);
+
+// Silent variants — same API calls but without triggering the global loading overlay
+export const getScheduleSilent = ({ roomId, date, from, to } = {}) =>
+  silentApi.get('/schedule', { params: { ...(roomId != null ? { roomId } : {}), ...(date ? { date } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) } }).then((r) => r.data);
+export const getRoomsSilent = () => silentApi.get('/rooms').then((r) => r.data);
+export const getTherapistsSilent = () => silentApi.get('/therapists').then((r) => r.data);
+export const getRoomNotesSilentAll = () => silentApi.get('/room-notes').then((r) => r.data);
+export const getRoomNotesSilent = (roomId) =>
+  silentApi.get('/room-notes', { params: roomId != null ? { roomId } : {} }).then((r) => r.data);
+export const bookSlotSilent = (roomId, date, startHour, endHour, therapistId, note) =>
+  silentApi.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}) }).then((r) => r.data);
+export const bookRecurringSilent = (data) => silentApi.post('/recurring', data).then((r) => r.data);

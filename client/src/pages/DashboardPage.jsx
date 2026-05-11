@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getRooms, getSchedule, getRoomNotes } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { getRooms, getSchedule, getRoomNotes, getTherapists, getScheduleSilent, getRoomsSilent, getTherapistsSilent, getRoomNotesSilentAll } from '../services/api';
 import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import AddBookingModal from '../components/AddBookingModal';
 
 const HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -25,9 +25,8 @@ function formatDateHe(dateStr){
 function hLabel(h){return `${h}:00`;}
 function getNow(){const n=new Date();return{dateStr:toDateStr(n),hour:n.getHours(),minute:n.getMinutes()};}
 
-function RoomModal({room,onClose}){
-  const navigate=useNavigate();
-  const handleAddSlot=()=>{onClose();navigate('/schedule',{state:{preselectedRoomId:room.id}});};
+function RoomModal({room,onClose,onAddSlot}){
+  const handleAddSlot=()=>{onClose();onAddSlot(room);};
   const today=new Date();today.setHours(0,0,0,0);
   const [year,setYear]=useState(today.getFullYear());
   const [month,setMonth]=useState(today.getMonth());
@@ -542,22 +541,28 @@ export default function DashboardPage(){
   const [rooms,setRooms]=useState([]);
   const [slots,setSlots]=useState([]);
   const [roomNotes,setRoomNotes]=useState([]);
+  const [therapists,setTherapists]=useState([]);
   const [loading,setLoading]=useState(true);
   const [lastUpdated,setLastUpdated]=useState(null);
   const [view,setView]=useState('grid');
   const [modalRoom,setModalRoom]=useState(null);
+  const [addBookingRoom,setAddBookingRoom]=useState(null);
 
-  const fetchData=async()=>{
+  const fetchData=async(silent=false)=>{
     try{
       const today=new Date();
       const future=new Date(today);future.setDate(today.getDate()+30);
-      const [r,s,n]=await Promise.all([getRooms(),getSchedule({from:toDateStr(today),to:toDateStr(future)}),getRoomNotes()]);
+      const fetchRooms=silent?getRoomsSilent:getRooms;
+      const fetchSchedule=silent?getScheduleSilent:getSchedule;
+      const fetchNotes=silent?getRoomNotesSilentAll:getRoomNotes;
+      const fetchTherapists=silent?getTherapistsSilent:getTherapists;
+      const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:toDateStr(today),to:toDateStr(future)}),fetchNotes(),fetchTherapists()]);
       const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
-      setRooms(sortedR);setSlots(s);setRoomNotes(n);setLastUpdated(new Date());
+      setRooms(sortedR);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
-  useEffect(()=>{fetchData();const i=setInterval(fetchData,60000);return()=>clearInterval(i);},[]);
+  useEffect(()=>{fetchData();const i=setInterval(()=>fetchData(true),60000);return()=>clearInterval(i);},[]);
 
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
@@ -603,7 +608,13 @@ export default function DashboardPage(){
           ):<TimelineView rooms={rooms} slots={slots}/>}
         </>
       )}
-      {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)}/>}
+      {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)} onAddSlot={(r)=>setAddBookingRoom(r)}/>}
+      {addBookingRoom&&<AddBookingModal
+        room={addBookingRoom}
+        therapists={therapists}
+        onClose={()=>setAddBookingRoom(null)}
+        onSuccess={(newSlots)=>setSlots(p=>[...p,...newSlots])}
+      />}
     </div>
   );
 }
