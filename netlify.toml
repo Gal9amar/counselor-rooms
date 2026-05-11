@@ -1,6 +1,6 @@
 [build]
   publish = "client/dist"
-  command = "cd client && npm install && npm run build"
+  command = "npx prisma migrate deploy && cd client && npm install && npm run build"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -64,6 +64,16 @@
 [[redirects]]
   from = "/api/room-notes/*"
   to = "/.netlify/functions/room-notes/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/booking-requests"
+  to = "/.netlify/functions/booking-requests"
+  status = 200
+
+[[redirects]]
+  from = "/api/booking-requests/*"
+  to = "/.netlify/functions/booking-requests/:splat"
   status = 200
 
 [[redirects]]

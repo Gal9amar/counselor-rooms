@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import SchedulePage from './pages/SchedulePage';
 import MySchedulePage from './pages/MySchedulePage';
 import AdminPage from './pages/AdminPage';
+import NewBookingPage from './pages/NewBookingPage';
 
 export const LoadingContext = createContext({ loading: false, setLoading: () => {} });
 export function useLoading() { return useContext(LoadingContext); }
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="/my-schedule" element={<MySchedulePage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Route>
+          <Route path="/new-booking" element={<NewBookingPage />} />
         </Routes>
       </BrowserRouter>
     </LoadingContext.Provider>

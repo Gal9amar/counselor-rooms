@@ -73,6 +73,20 @@ export const deleteRoomNote = (id) => api.delete(`/room-notes/${id}`).then((r) =
 export const verifyAdmin = (password) =>
   api.post('/admin/verify', { password }).then((r) => r.data);
 
+// Booking Requests
+export const getBookingRequests = (status) =>
+  api.get('/booking-requests', { params: status ? { status } : {} }).then((r) => r.data);
+export const createBookingRequest = (data) =>
+  api.post('/booking-requests', data).then((r) => r.data);
+export const approveBookingRequest = (id, overrides = {}) =>
+  api.patch(`/booking-requests/${id}`, { status: 'approved', ...overrides }).then((r) => r.data);
+export const rejectBookingRequest = (id) =>
+  api.patch(`/booking-requests/${id}`, { status: 'rejected' }).then((r) => r.data);
+export const updateBookingRequest = (id, data) =>
+  api.patch(`/booking-requests/${id}`, data).then((r) => r.data);
+export const deleteBookingRequest = (id) =>
+  api.delete(`/booking-requests/${id}`).then((r) => r.data);
+
 // Silent variants — same API calls but without triggering the global loading overlay
 export const getScheduleSilent = ({ roomId, date, from, to } = {}) =>
   silentApi.get('/schedule', { params: { ...(roomId != null ? { roomId } : {}), ...(date ? { date } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) } }).then((r) => r.data);

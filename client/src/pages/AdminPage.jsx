@@ -5,8 +5,9 @@ import {
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
   getSchedule, updateSlot, clearSlot, updateRecurring, deleteRecurring,
   getRoomNotes, addRoomNote, deleteRoomNote,
+  getBookingRequests, approveBookingRequest, rejectBookingRequest, updateBookingRequest, deleteBookingRequest,
 } from '../services/api';
-import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays, GripVertical, MessageSquarePlus, AlertTriangle, ListChecks } from 'lucide-react';
+import { Trash2, Plus, LogIn, Pencil, Check, X, RefreshCw, CalendarDays, GripVertical, MessageSquarePlus, AlertTriangle, ListChecks, Inbox, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const DAYS_SHORT=['א','ב','ג','ד','ה','ו','ש'];
@@ -143,8 +144,20 @@ export default function AdminPage(){
   const [noteForm,setNoteForm]=useState({message:'',startDate:'',endDate:'',startHour:'',endHour:'',blocksBooking:false});
   const [noteSaving,setNoteSaving]=useState(false);
   const [noteError,setNoteError]=useState('');
+  const [bookingRequests,setBookingRequests]=useState([]);
+  const [requestsLoading,setRequestsLoading]=useState(false);
+  const [editRequest,setEditRequest]=useState(null); // {id, therapistName, roomId, date, startHour, endHour, note}
+  const [editRequestErr,setEditRequestErr]=useState('');
+  const [editRequestSaving,setEditRequestSaving]=useState(false);
 
-  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);getRoomNotes().then(setRoomNotes).catch(()=>{});}},[authed]);
+  const loadRequests=async()=>{
+    setRequestsLoading(true);
+    try{const r=await getBookingRequests('pending');setBookingRequests(r);}
+    catch{setBookingRequests([]);}
+    finally{setRequestsLoading(false);}
+  };
+
+  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);getRoomNotes().then(setRoomNotes).catch(()=>{});loadRequests();}},[authed]);
 
   const loadAll=async(year,months)=>{
     const y=year??filterYear;
@@ -413,10 +426,57 @@ export default function AdminPage(){
     </div>
   );
 
+  const handleApproveRequest=async(req,overrides={})=>{
+    try{
+      const res=await approveBookingRequest(req.id,overrides);
+      setBookingRequests(p=>p.filter(r=>r.id!==req.id));
+      if(res.slot){setSlots(p=>[...p,res.slot]);}
+      setEditRequest(null);
+    }catch(e){
+      const msg=e.response?.data?.error||'שגיאה באישור הבקשה';
+      setEditRequestErr(msg);
+    }
+  };
+  const handleRejectRequest=async(id)=>{
+    if(!confirm('לדחות את הבקשה?'))return;
+    try{await rejectBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+  const handleDeleteRequest=async(id)=>{
+    if(!confirm('למחוק את הבקשה לצמיתות?'))return;
+    try{await deleteBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));}
+    catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+  const openEditRequest=(req)=>{
+    setEditRequest({
+      id:req.id,
+      therapistName:req.therapistName,
+      roomId:req.roomId,
+      date:toDateStr(new Date(req.date)),
+      startHour:req.startHour,
+      endHour:req.endHour,
+      note:req.note||'',
+    });
+    setEditRequestErr('');
+  };
+  const saveEditRequest=async()=>{
+    const {id,therapistName,roomId,date,startHour,endHour,note}=editRequest;
+    if(endHour<=startHour){setEditRequestErr('סיום אחרי התחלה');return;}
+    setEditRequestSaving(true);setEditRequestErr('');
+    try{
+      const updated=await updateBookingRequest(id,{therapistName,roomId,date,startHour,endHour,note:note||null});
+      setBookingRequests(p=>p.map(r=>r.id===id?{...r,...updated}:r));
+      setEditRequest(null);
+    }catch(e){setEditRequestErr(e.response?.data?.error||'שגיאה');}
+    finally{setEditRequestSaving(false);}
+  };
+
+  const pendingCount=bookingRequests.length;
   const tabs=[
     {id:'rooms',label:'חדרים',count:rooms.length},
     {id:'therapists',label:'מטפלים',count:therapists.length},
     {id:'schedule',label:'שיבוצים',count:slots.length},
+    {id:'requests',label:'בקשות',count:pendingCount,highlight:pendingCount>0},
   ];
 
   return(
@@ -800,12 +860,14 @@ export default function AdminPage(){
         <button onClick={()=>{sessionStorage.removeItem('adminPass');setAuthed(false);}} className="btn-ghost text-sm px-3 py-1.5">יציאה</button>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
         {tabs.map(t=>(
-          <button key={t.id} onClick={()=>{setTab(t.id);setError('');}}
+          <button key={t.id} onClick={()=>{setTab(t.id);setError('');if(t.id==='requests')loadRequests();}}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${tab===t.id?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'}`}>
             {t.label}
-            {t.count>0&&<span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${tab===t.id?'bg-green-100 text-green-700':'bg-gray-200 text-gray-500'}`}>{t.count}</span>}
+            {t.count>0&&<span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
+              t.highlight?'bg-orange-500 text-white':tab===t.id?'bg-green-100 text-green-700':'bg-gray-200 text-gray-500'
+            }`}>{t.count}</span>}
           </button>
         ))}
       </div>
@@ -1006,7 +1068,140 @@ export default function AdminPage(){
           )}
         </div>
       )}
+
+      {tab==='requests'&&(
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-500">{requestsLoading?'טוען...':bookingRequests.length===0?'אין בקשות ממתינות':`${bookingRequests.length} בקשות ממתינות לאישור`}</p>
+            <button onClick={loadRequests} className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"><RefreshCw size={13}/> רענן</button>
+          </div>
+          {bookingRequests.length===0&&!requestsLoading&&(
+            <div className="card rounded-2xl p-10 text-center">
+              <Inbox size={36} className="text-gray-300 mx-auto mb-3"/>
+              <p className="text-gray-400 text-sm">אין בקשות שיבוץ ממתינות</p>
+            </div>
+          )}
+          {bookingRequests.map(req=>{
+            const ds=toDateStr(new Date(req.date));
+            return(
+              <div key={req.id} className="card rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 bg-orange-50 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-gray-800">{req.therapistName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{formatDateHe(ds)} · {hLabel(req.startHour)}–{hLabel(req.endHour)}</p>
+                  </div>
+                  <span className="text-xs bg-orange-100 text-orange-700 font-semibold px-2.5 py-1 rounded-full">{req.room?.name||'חדר לא ידוע'}</span>
+                </div>
+                {req.note&&(
+                  <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700 flex items-start gap-1.5">
+                    <span className="shrink-0">📝</span>{req.note}
+                  </div>
+                )}
+                <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={()=>handleApproveRequest(req)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg px-3 py-2 transition-colors">
+                    <CheckCircle2 size={14}/> אשר שיבוץ
+                  </button>
+                  <button
+                    onClick={()=>openEditRequest(req)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 transition-colors">
+                    <Pencil size={13}/> ערוך ואשר
+                  </button>
+                  <button
+                    onClick={()=>handleRejectRequest(req.id)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-3 py-2 transition-colors">
+                    <XCircle size={14}/> דחה
+                  </button>
+                  <button
+                    onClick={()=>handleDeleteRequest(req.id)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200 rounded-lg px-3 py-2 transition-colors mr-auto">
+                    <Trash2 size={13}/> מחק
+                  </button>
+                </div>
+                <div className="px-4 py-1.5 border-t border-gray-50 text-xs text-gray-300">
+                  התקבל: {new Date(req.createdAt).toLocaleString('he-IL')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       </div>
+
+      {/* Edit Request Modal */}
+      {editRequest&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setEditRequest(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2"><Pencil size={16} className="text-blue-500"/> עריכת בקשת שיבוץ</h3>
+              <button onClick={()=>setEditRequest(null)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שם מבקש</label>
+                <input className="input py-2 text-sm" value={editRequest.therapistName}
+                  onChange={e=>setEditRequest(p=>({...p,therapistName:e.target.value}))}/>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">חדר</label>
+                <select className="input py-2 text-sm" value={editRequest.roomId}
+                  onChange={e=>setEditRequest(p=>({...p,roomId:parseInt(e.target.value)}))}>
+                  {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">תאריך</label>
+                <input type="date" dir="ltr" className="input py-2 text-sm" value={editRequest.date}
+                  onChange={e=>setEditRequest(p=>({...p,date:e.target.value}))}/>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת התחלה</label>
+                  <select className="input py-2 text-sm" value={editRequest.startHour}
+                    onChange={e=>setEditRequest(p=>({...p,startHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">שעת סיום</label>
+                  <select className="input py-2 text-sm" value={editRequest.endHour}
+                    onChange={e=>setEditRequest(p=>({...p,endHour:parseInt(e.target.value)}))}>
+                    {ALL_HOURS.filter(h=>h>editRequest.startHour).map(h=><option key={h} value={h}>{hLabel(h)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">הערה</label>
+                <input className="input py-2 text-sm" placeholder="הערה (לא חובה)" value={editRequest.note}
+                  onChange={e=>setEditRequest(p=>({...p,note:e.target.value}))} maxLength={200}/>
+              </div>
+              {editRequestErr&&<p className="text-red-500 text-xs">{editRequestErr}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={()=>handleApproveRequest(editRequest,{
+                    therapistName:editRequest.therapistName,
+                    roomId:editRequest.roomId,
+                    date:editRequest.date,
+                    startHour:editRequest.startHour,
+                    endHour:editRequest.endHour,
+                    note:editRequest.note||null,
+                  })}
+                  disabled={editRequestSaving}
+                  className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-1.5">
+                  <CheckCircle2 size={15}/> {editRequestSaving?'מאשר...':'אשר שיבוץ'}
+                </button>
+                <button
+                  onClick={saveEditRequest}
+                  disabled={editRequestSaving}
+                  className="btn-secondary px-4 py-2.5 text-sm">
+                  שמור בלבד
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

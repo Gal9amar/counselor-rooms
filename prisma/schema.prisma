@@ -14,8 +14,9 @@ model Room {
   name          String         @unique
   order         Int            @default(0)
   createdAt     DateTime       @default(now())
-  scheduleSlots ScheduleSlot[]
-  notes         RoomNote[]
+  scheduleSlots   ScheduleSlot[]
+  notes           RoomNote[]
+  bookingRequests BookingRequest[]
 }
 
 model RoomNote {
@@ -56,6 +57,22 @@ model ScheduleSlot {
   @@index([therapistId])
   @@index([date])
   @@index([recurringId])
+}
+
+model BookingRequest {
+  id            Int      @id @default(autoincrement())
+  therapistName String
+  roomId        Int
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  date          DateTime // midnight UTC
+  startHour     Int
+  endHour       Int
+  note          String?
+  status        String   @default("pending") // "pending" | "approved" | "rejected"
+  createdAt     DateTime @default(now())
+
+  @@index([status])
+  @@index([date])
 }
 
 model RecurringSchedule {
