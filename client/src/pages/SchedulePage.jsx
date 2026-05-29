@@ -256,11 +256,11 @@ export default function SchedulePage() {
 
   const handleBook = async () => {
     const end = parseInt(endHour);
-    if (!end || end <= startHour) { setBookError('שעת סיום לא תקינה'); return; }
-    if (!selectedTherapist) { setBookError('בחר שם'); return; }
+    if (!end || end <= startHour) { setBookError('שעת הסיום אינה תקינה'); return; }
+    if (!selectedTherapist) { setBookError('נא לבחור שם'); return; }
     const _tName = therapists.find(t => t.id === parseInt(selectedTherapist))?.name || '';
-    if (_tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף רווחה יש למלא הערה'); return; }
-    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים חופף'); return; }
+    if (_tName === 'אגף הרווחה' && !note.trim()) { setBookError('עבור אגף הרווחה יש למלא הערה'); return; }
+    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלו'); return; }
 
     setBooking(true); setBookError('');
 
@@ -410,7 +410,7 @@ export default function SchedulePage() {
               <p className="text-gray-400 text-sm">בחר תאריך לשיבוץ</p>
             <div className="flex items-center gap-2 mt-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0 inline-block"/>
-              <span className="text-sm font-semibold text-gray-700">נקודה ירוקה = יש שיבוצים באותו יום</span>
+              <span className="text-sm font-semibold text-gray-700">נקודה ירוקה — יש שיבוצים באותו יום</span>
             </div>
           </div>
             <button onClick={handleAddYear} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-2 whitespace-nowrap">
@@ -490,10 +490,10 @@ export default function SchedulePage() {
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת סיום</label>
                   <select className="input" value={endHour} onChange={e => setEndHour(e.target.value)}>
-                    <option value="">-- בחר --</option>
+                    <option value="">בחר שעה...</option>
                     {ALL_HOURS.filter(h => h > startHour).map(h => {
                       const blocked = Array.from({ length: h - startHour }, (_, i) => startHour + i).some(x => occupiedHours.has(x));
-                      return <option key={h} value={h} disabled={blocked}>{hLabel(h)}{blocked ? ' (חסום)' : ''}</option>;
+                      return <option key={h} value={h} disabled={blocked}>{hLabel(h)}{blocked ? ' (תפוס)' : ''}</option>;
                     })}
                     {!occupiedHours.has(21) && startHour <= 21 && <option value={22}>22:00</option>}
                   </select>
@@ -501,7 +501,7 @@ export default function SchedulePage() {
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך</label>
                   <select className="input" value={selectedTherapist} onChange={e => setSelectedTherapist(e.target.value)}>
-                    <option value="">-- בחר --</option>
+                    <option value="">בחר שם...</option>
                     {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>

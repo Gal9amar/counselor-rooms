@@ -116,7 +116,7 @@ export default function MySchedulePage() {
           value={selectedId}
           onChange={e => setSelectedId(e.target.value)}
         >
-          <option value="">-- בחר את שמך --</option>
+          <option value="">בחר את שמך</option>
           {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 text-xs">▾</div>
@@ -155,7 +155,7 @@ export default function MySchedulePage() {
                 </div>
                 <div className="text-center shrink-0 bg-white/60 rounded-xl px-3 py-2 border border-green-200">
                   <p className="text-2xl font-bold text-green-600">{monthHours}</p>
-                  <p className="text-xs text-gray-400 whitespace-nowrap">שע' ב{MONTHS_HE[viewMonth]}</p>
+                  <p className="text-xs text-gray-400 whitespace-nowrap">שעות ב{MONTHS_HE[viewMonth]}</p>
                 </div>
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function MySchedulePage() {
                         <span className={`text-sm ${isToday?'text-green-600':'text-gray-400'}`}>{d.getDate()} {MONTHS_HE[d.getMonth()]}</span>
                         {isToday && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">היום</span>}
                       </div>
-                      <span className="text-xs text-gray-400">{daySlots.length} שיבוצים · {dayHours} שע'</span>
+                      <span className="text-xs text-gray-400">{daySlots.length} שיבוצים · {dayHours} שעות</span>
                     </div>
 
                     {/* Timeline bar */}
