@@ -179,10 +179,10 @@ export default function AdminPage(){
 
   const saveNote=async()=>{
     const {message,startDate,endDate,startHour,endHour,blocksBooking}=noteForm;
-    if(!message.trim()||!startDate||!endDate){setNoteError('יש למלא הודעה, תאריך התחלה וסיום');return;}
+    if(!message.trim()||!startDate||!endDate){setNoteError('יש למלא הערה, תאריך התחלה ותאריך סיום');return;}
     const sh=startHour!==''?parseInt(startHour):null;
     const eh=endHour!==''?parseInt(endHour):null;
-    if(sh!=null&&eh!=null&&eh<=sh){setNoteError('שעת סיום אחרי שעת התחלה');return;}
+    if(sh!=null&&eh!=null&&eh<=sh){setNoteError('שעת הסיום חייבת להיות לאחר שעת ההתחלה');return;}
     setNoteSaving(true);setNoteError('');
     try{
       const n=await addRoomNote({roomId:noteModal,message:message.trim(),startDate,endDate,startHour:sh,endHour:eh,blocksBooking});
@@ -241,10 +241,10 @@ export default function AdminPage(){
   };
   const saveRecurring=async()=>{
     const {rid,roomId,therapistId,startHour,endHour,note,startDate,frequency,daysOfWeek,endDate,occurrences,endMode}=editRecurring;
-    if(endHour<=startHour){setEditRecurringErr('סיום אחרי התחלה');return;}
+    if(endHour<=startHour){setEditRecurringErr('שעת הסיום חייבת להיות לאחר שעת ההתחלה');return;}
     if(frequency==='weekly'&&daysOfWeek.length===0){setEditRecurringErr('יש לבחור לפחות יום אחד');return;}
     if(endMode==='date'&&!endDate){setEditRecurringErr('יש לבחור תאריך סיום');return;}
-    if(endMode==='occurrences'&&(!occurrences||parseInt(occurrences)<1)){setEditRecurringErr('יש להזין מספר חזרות');return;}
+    if(endMode==='occurrences'&&(!occurrences||parseInt(occurrences)<1)){setEditRecurringErr('יש להזין מספר מופעים');return;}
     setEditRecurringSaving(true);setEditRecurringErr('');
     try{
       const payload={roomId,therapistId,startHour,endHour,note:note||null,startDate,frequency,daysOfWeek,
@@ -336,7 +336,7 @@ export default function AdminPage(){
   };
   const saveEditSlot=async()=>{
     const {id,roomId,date,startHour,endHour,therapistId,note}=editSlot;
-    if(endHour<=startHour){setEditSlotErr('סיום אחרי התחלה');return;}
+    if(endHour<=startHour){setEditSlotErr('שעת הסיום חייבת להיות לאחר שעת ההתחלה');return;}
     setEditSlotSaving(true);setEditSlotErr('');
     try{
       const updated=await updateSlot(id,startHour,endHour,therapistId,note||null,roomId,date);
@@ -461,7 +461,7 @@ export default function AdminPage(){
   };
   const saveEditRequest=async()=>{
     const {id,therapistName,roomId,date,startHour,endHour,note}=editRequest;
-    if(endHour<=startHour){setEditRequestErr('סיום אחרי התחלה');return;}
+    if(endHour<=startHour){setEditRequestErr('שעת הסיום חייבת להיות לאחר שעת ההתחלה');return;}
     setEditRequestSaving(true);setEditRequestErr('');
     try{
       const updated=await updateBookingRequest(id,{therapistName,roomId,date,startHour,endHour,note:note||null});
@@ -566,14 +566,14 @@ export default function AdminPage(){
                   <button type="button"
                     onClick={()=>setEditRecurring(p=>({...p,endMode:'occurrences'}))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editRecurring.endMode==='occurrences'?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                    מספר חזרות
+                    מספר מופעים
                   </button>
                 </div>
                 {editRecurring.endMode==='date'?(
                   <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.endDate}
                     onChange={e=>setEditRecurring(p=>({...p,endDate:e.target.value}))}/>
                 ):(
-                  <input type="number" min="1" max="500" className="input py-2 text-sm" placeholder="מספר חזרות"
+                  <input type="number" min="1" max="500" className="input py-2 text-sm" placeholder="מספר מופעים"
                     value={editRecurring.occurrences}
                     onChange={e=>setEditRecurring(p=>({...p,occurrences:e.target.value}))}/>
                 )}
@@ -799,7 +799,7 @@ export default function AdminPage(){
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">הודעה</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">הערה</label>
                 <input className="input py-2 text-sm" placeholder='למשל: "בתיקון עד יום ה׳"'
                   value={noteForm.message} onChange={e=>setNoteForm(p=>({...p,message:e.target.value}))} maxLength={200}/>
               </div>
@@ -816,7 +816,7 @@ export default function AdminPage(){
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">שעות (אופציונלי)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שעות (לא חובה)</label>
                 <div className="flex items-center gap-2">
                   <select className="input py-2 text-sm flex-1" value={noteForm.startHour}
                     onChange={e=>setNoteForm(p=>({...p,startHour:e.target.value}))}>
@@ -838,7 +838,7 @@ export default function AdminPage(){
                     ?'bg-red-50 border-red-200 text-red-700'
                     :'bg-gray-50 border-gray-200 text-gray-600'
                 }`}>
-                <span className="text-sm font-medium">חסום שיבוצים בזמן ההערה</span>
+                <span className="text-sm font-medium">חסום שיבוצים בתקופת ההערה</span>
                 <div dir="ltr" className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${noteForm.blocksBooking?'bg-red-500':'bg-gray-300'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${noteForm.blocksBooking?'translate-x-4':'translate-x-0'}`}/>
                 </div>
@@ -1120,7 +1120,7 @@ export default function AdminPage(){
                   </button>
                 </div>
                 <div className="px-4 py-1.5 border-t border-gray-50 text-xs text-gray-300">
-                  התקבל: {new Date(req.createdAt).toLocaleString('he-IL')}
+                  התקבלה: {new Date(req.createdAt).toLocaleString('he-IL')}
                 </div>
               </div>
             );
@@ -1139,7 +1139,7 @@ export default function AdminPage(){
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">שם מבקש</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שם המבקש</label>
                 <input className="input py-2 text-sm" value={editRequest.therapistName}
                   onChange={e=>setEditRequest(p=>({...p,therapistName:e.target.value}))}/>
               </div>

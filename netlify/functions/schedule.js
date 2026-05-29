@@ -66,7 +66,7 @@ exports.handler = async (event) => {
         include: { therapist: true },
       });
       if (overlapping)
-        return err(`קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
+        return err(`קיים שיבוץ חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
 
       const slot = await prisma.scheduleSlot.create({
         data: { roomId, date: dateUTC, startHour, endHour, therapistId, ...(note ? { note } : {}) },
@@ -104,7 +104,7 @@ exports.handler = async (event) => {
         include: { therapist: true },
       });
       if (overlapping)
-        return err(`קיים חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
+        return err(`קיים שיבוץ חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
 
       const slot = await prisma.scheduleSlot.update({
         where: { id },

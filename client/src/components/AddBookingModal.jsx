@@ -273,11 +273,11 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
 
   const handleBook = async () => {
     const end = parseInt(endHour);
-    if (!end || end <= startHour) { setBookError('שעת סיום לא תקינה'); return; }
-    if (!therapistId) { setBookError('בחר שם'); return; }
+    if (!end || end <= startHour) { setBookError('שעת הסיום אינה תקינה'); return; }
+    if (!therapistId) { setBookError('נא לבחור שם'); return; }
     const tName = therapists.find(t => t.id === parseInt(therapistId))?.name || '';
-    if (tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף רווחה יש למלא הערה'); return; }
-    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים חופף'); return; }
+    if (tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף הרווחה יש למלא הערה'); return; }
+    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלו'); return; }
 
     setBooking(true); setBookError('');
 
@@ -355,7 +355,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
     if (!scatterTherapistId || scatterEntries.length === 0) return;
     const tName = therapists.find(t => t.id === parseInt(scatterTherapistId))?.name || '';
     if (tName === 'אגף רווחה' && !scatterNote.trim()) {
-      setBookError('עבור אגף רווחה יש למלא הערה');
+      setBookError('עבור אגף הרווחה יש למלא הערה');
       return;
     }
     setScatterSaving(true);
@@ -553,7 +553,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת התחלה</label>
                   <select className="input" value={startHour ?? ''} onChange={e => { setStartHour(parseInt(e.target.value)); setEndHour(''); setBookError(''); }}>
-                    <option value="">-- בחר --</option>
+                    <option value="">בחר...</option>
                     {ALL_HOURS.map(h => {
                       const occ = occupiedHours.has(h);
                       const blk = blockedHoursForDate.has(h);
@@ -567,7 +567,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת סיום</label>
                   <select className="input" value={endHour} disabled={startHour === null} onChange={e => { setBookError(''); setEndHour(e.target.value); }}>
-                    <option value="">-- בחר --</option>
+                    <option value="">בחר...</option>
                     {startHour !== null && [...ALL_HOURS.filter(h => h > startHour), ...(startHour <= 21 ? [22] : [])].map(h => {
                       const hoursInRange = Array.from({ length: h - startHour }, (_, i) => startHour + i);
                       const isSelfOccupied = occupiedHours.has(h - 1) || blockedHoursForDate.has(h - 1);
@@ -589,7 +589,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך</label>
                   <select className="input" value={therapistId} onChange={e => setTherapistId(e.target.value)}>
-                    <option value="">-- בחר --</option>
+                    <option value="">בחר...</option>
                     {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
@@ -663,7 +663,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                     )}
                   </div>
 
-                  {/* טווח תאריכים + סה"כ מפגשים */}
+                  {/* טווח תאריכים + סה״כ מפגשים */}
                   {(() => {
                     const stats = calcRecurStats(selectedDate, recurFrequency, recurDays, recurEndMode, recurOccurrences, recurEndDate);
                     if (!stats) return null;
@@ -675,7 +675,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                         </div>
                         <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
                           <span className="w-4 h-4 bg-blue-200 rounded-full flex items-center justify-center text-xs text-blue-800 shrink-0">✓</span>
-                          <span>סה"כ <strong>{stats.count}</strong> מפגשים</span>
+                          <span>סה״כ <strong>{stats.count}</strong> מפגשים</span>
                         </div>
                       </div>
                     );
@@ -745,7 +745,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-600 mb-1.5">שם המטפל</label>
                       <select className="input" value={scatterTherapistId} onChange={e => setScatterTherapistId(e.target.value)}>
-                        <option value="">-- בחר --</option>
+                        <option value="">בחר...</option>
                         {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
@@ -807,7 +807,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                             <div className="flex-1">
                               <p className="text-xs text-gray-500 mb-1.5">שעת התחלה:</p>
                               <select className="input text-sm" value={scatterStart ?? ''} onChange={e => { setScatterStart(parseInt(e.target.value)); setScatterEnd(''); }}>
-                                <option value="">-- בחר --</option>
+                                <option value="">בחר...</option>
                                 {ALL_HOURS.map(h => {
                                   const occ = occupiedHoursForPending.has(h);
                                   const blk = blockedHoursForPending.has(h);
@@ -819,7 +819,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                               <p className="text-xs text-gray-500 mb-1.5">שעת סיום:</p>
                               <select className="input text-sm" value={scatterEnd} disabled={scatterStart === null}
                                 onChange={e => { setBookError(''); setScatterEnd(e.target.value); }}>
-                                <option value="">-- בחר --</option>
+                                <option value="">בחר...</option>
                                 {scatterStart !== null && [...ALL_HOURS.filter(h => h > scatterStart), ...(scatterStart <= 21 ? [22] : [])].map(h => {
                                   const hoursInRange = Array.from({ length: h - scatterStart }, (_, i) => scatterStart + i);
                                   const isSelfOccupied = occupiedHoursForPending.has(h - 1) || blockedHoursForPending.has(h - 1);

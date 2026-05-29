@@ -838,7 +838,7 @@ export default function NewBookingPage() {
                                 <CalendarRange size={14} className="shrink-0" />
                                 סדרת הטיפולים: <strong>{formatShort(stats.startDate)}</strong> עד <strong>{formatShort(stats.endDate)}</strong>
                               </p>
-                              <p className="text-sm text-blue-600 font-medium">סה"כ <strong>{stats.count}</strong> מפגשים</p>
+                              <p className="text-sm text-blue-600 font-medium">סה״כ <strong>{stats.count}</strong> מפגשים</p>
                             </div>
                           );
                         })()}
