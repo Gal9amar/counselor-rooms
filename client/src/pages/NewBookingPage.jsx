@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   CalendarDays, Repeat2, CalendarRange, ChevronLeft, ChevronRight,
-  CheckCircle, X, AlertTriangle,
+  CheckCircle, X, AlertTriangle, Info,
 } from 'lucide-react';
 import { getRoomsSilent, getTherapistsSilent, getScheduleSilent, getRoomNotesSilent, createBookingRequest } from '../services/api';
 
@@ -128,6 +128,32 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blo
   );
 }
 
+// ─── Calendar legend ─────────────────────────────────────────────────────────
+function CalendarLegend({ showScatter }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+      <span className="flex items-center gap-1.5 text-xs text-gray-500">
+        <span className="w-4 h-4 rounded-md bg-green-50 border border-green-200 inline-block" />
+        יש שיבוץ קיים
+      </span>
+      <span className="flex items-center gap-1.5 text-xs text-gray-500">
+        <span className="w-4 h-4 rounded-md bg-red-100 border border-red-200 inline-block" />
+        חסום לחלוטין
+      </span>
+      <span className="flex items-center gap-1.5 text-xs text-gray-500">
+        <span className="w-4 h-4 rounded-md bg-orange-50 border border-orange-200 inline-block" />
+        חלק מהשעות חסומות
+      </span>
+      {showScatter && (
+        <span className="flex items-center gap-1.5 text-xs text-gray-500">
+          <span className="w-4 h-4 rounded-md bg-blue-100 border border-blue-300 inline-block" />
+          תאריך שנבחר
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── TYPE PICKER ─────────────────────────────────────────────────────────────
 const BOOKING_TYPES = [
   {
@@ -135,30 +161,60 @@ const BOOKING_TYPES = [
     icon: CalendarDays,
     iconBg: 'bg-green-100',
     iconColor: 'text-green-600',
+    accentBg: 'bg-green-500',
+    accentLight: 'bg-green-50',
+    accentText: 'text-green-700',
+    accentBorder: 'border-green-200',
+    accentRing: 'ring-green-400',
     border: 'hover:border-green-400',
+    badgeBg: 'bg-green-100',
+    badgeText: 'text-green-700',
     title: 'שיבוץ יחיד',
     subtitle: 'תאריך אחד, שעות קבועות',
     bullets: ['בוחרים תאריך ספציפי', 'קובעים שעת התחלה וסיום', 'מתאים לפגישה חד-פעמית'],
+    example: 'לדוגמה: פגישת הערכה ב-5 ביוני, 14:00–15:00',
+    steps: ['בחר שמך וחדר', 'לחץ על תאריך בלוח', 'קבע שעת התחלה וסיום ושלח'],
+    formHint: 'בחר תאריך ספציפי בלוח ולאחר מכן קבע את שעות השיבוץ',
   },
   {
     id: 'recurring',
     icon: Repeat2,
     iconBg: 'bg-blue-100',
     iconColor: 'text-blue-600',
+    accentBg: 'bg-blue-500',
+    accentLight: 'bg-blue-50',
+    accentText: 'text-blue-700',
+    accentBorder: 'border-blue-200',
+    accentRing: 'ring-blue-400',
     border: 'hover:border-blue-400',
+    badgeBg: 'bg-blue-100',
+    badgeText: 'text-blue-700',
     title: 'שיבוץ חוזר',
     subtitle: 'יומי, שבועי או חודשי',
     bullets: ['קובעים תדירות חזרה', 'הגדרת ימים בשבוע (לשבועי)', 'מתאים לטיפולים קבועים'],
+    example: 'לדוגמה: כל יום שלישי ורביעי 10:00–11:00 לשלושה חודשים',
+    steps: ['בחר שמך וחדר', 'בחר תאריך התחלה ושעות', 'הגדר תדירות ותאריך סיום'],
+    formHint: 'בחר תאריך התחלה ושעות, ואז הגדר את תדירות וסיום הסדרה',
   },
   {
     id: 'scatter',
     icon: CalendarRange,
     iconBg: 'bg-purple-100',
     iconColor: 'text-purple-600',
+    accentBg: 'bg-purple-500',
+    accentLight: 'bg-purple-50',
+    accentText: 'text-purple-700',
+    accentBorder: 'border-purple-200',
+    accentRing: 'ring-purple-400',
     border: 'hover:border-purple-400',
+    badgeBg: 'bg-purple-100',
+    badgeText: 'text-purple-700',
     title: 'שיבוץ תפזורת',
     subtitle: 'ימים נבחרים, שעות שונות',
     bullets: ['בוחרים מספר תאריכים לא רצופים', 'שעות שונות לכל תאריך', 'מתאים ללוח זמנים גמיש'],
+    example: 'לדוגמה: 3/6 ב-09:00, 7/6 ב-14:00, 15/6 ב-11:00',
+    steps: ['בחר שמך וחדר', 'לחץ על ימים בלוח ובחר שעות לכל יום', 'הוסף הערה ושלח'],
+    formHint: 'לחץ על כל יום בלוח, הגדר שעות, ואז עבור ליום הבא — ניתן לבחור כמה ימים שרוצים',
   },
 ];
 
@@ -387,7 +443,6 @@ export default function NewBookingPage() {
       if (scatterEntries.length === 0) { setError('יש לבחור לפחות תאריך אחד'); return; }
       setSaving(true);
       try {
-        // שולח בקשה אחת לכל entry
         for (const entry of scatterEntries) {
           await createBookingRequest({
             therapistName: therapistName,
@@ -421,6 +476,11 @@ export default function NewBookingPage() {
   const nextScatMonth = () => scatterMonth === 11 ? (setScatterYear(y => y+1), setScatterMonth(0)) : setScatterMonth(m => m+1);
 
   const currentType = BOOKING_TYPES.find(t => t.id === bookingType);
+
+  // current form step index for the step guide
+  const formStepIndex = (bookingType === 'single' || bookingType === 'recurring')
+    ? (calStep === 'calendar' ? 1 : 2)
+    : 1;
 
   // ── render ──
   return (
@@ -463,21 +523,35 @@ export default function NewBookingPage() {
                 const Icon = type.icon;
                 return (
                   <button key={type.id} onClick={() => handleSelectType(type.id)}
-                    className={`bg-white rounded-2xl border-2 border-gray-100 p-6 text-right flex flex-col gap-4 transition-all shadow-sm hover:shadow-md ${type.border}`}>
-                    <div className={`w-12 h-12 ${type.iconBg} rounded-xl flex items-center justify-center`}>
-                      <Icon size={24} className={type.iconColor} />
+                    className={`bg-white rounded-2xl border-2 border-gray-100 text-right flex flex-col overflow-hidden transition-all shadow-sm hover:shadow-md ${type.border} hover:border-opacity-100`}>
+                    {/* Colored header bar */}
+                    <div className={`${type.accentBg} px-5 py-4 flex items-center gap-3 w-full`}>
+                      <div className="w-10 h-10 bg-white bg-opacity-25 rounded-xl flex items-center justify-center shrink-0">
+                        <Icon size={22} className="text-white" />
+                      </div>
+                      <div className="text-right flex-1">
+                        <p className="font-bold text-white text-base leading-tight">{type.title}</p>
+                        <p className="text-xs text-white text-opacity-80 opacity-80">{type.subtitle}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-800 text-base mb-1">{type.title}</p>
-                      <p className="text-xs text-gray-400 mb-3">{type.subtitle}</p>
-                      <ul className="space-y-1">
+
+                    {/* Body */}
+                    <div className="px-5 py-4 flex flex-col gap-3 flex-1">
+                      <ul className="space-y-1.5">
                         {type.bullets.map((b, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-gray-500">
-                            <span className="text-green-400 mt-0.5 shrink-0">✓</span>
+                          <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                            <span className={`mt-0.5 shrink-0 font-bold ${type.accentText}`}>✓</span>
                             {b}
                           </li>
                         ))}
                       </ul>
+
+                      {/* Example */}
+                      <div className={`${type.accentLight} border ${type.accentBorder} rounded-xl px-3 py-2 mt-auto`}>
+                        <p className={`text-xs ${type.accentText} leading-relaxed`}>
+                          <span className="font-semibold">לדוגמה: </span>{type.example.replace('לדוגמה: ', '')}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 );
@@ -490,7 +564,7 @@ export default function NewBookingPage() {
         {step === 'form' && (
           <div className="fade-up">
             {/* Back + title */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <button onClick={handleBackToTypes}
                 className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
                 <ChevronRight size={20} />
@@ -508,10 +582,47 @@ export default function NewBookingPage() {
               </div>
             </div>
 
+            {/* Guidance banner */}
+            {currentType && (
+              <div className={`${currentType.accentLight} border ${currentType.accentBorder} rounded-2xl px-4 py-3 mb-5`}>
+                <div className="flex items-start gap-2 mb-2.5">
+                  <Info size={15} className={`${currentType.accentText} mt-0.5 shrink-0`} />
+                  <p className={`text-sm ${currentType.accentText} font-medium leading-snug`}>{currentType.formHint}</p>
+                </div>
+                {/* Step guide */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  {currentType.steps.map((s, i) => (
+                    <React.Fragment key={i}>
+                      <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium
+                        ${i < formStepIndex
+                          ? `${currentType.accentBg} text-white`
+                          : i === formStepIndex
+                            ? `${currentType.accentBg} text-white ring-2 ${currentType.accentRing} ring-offset-1`
+                            : `bg-white bg-opacity-60 ${currentType.accentText} opacity-60`
+                        }`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold
+                          ${i < formStepIndex ? 'bg-white bg-opacity-30' : 'bg-white bg-opacity-30'}`}>
+                          {i < formStepIndex ? '✓' : i + 1}
+                        </span>
+                        {s}
+                      </span>
+                      {i < currentType.steps.length - 1 && (
+                        <ChevronLeft size={12} className={`${currentType.accentText} opacity-40 shrink-0`} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* שם + חדר — תמיד מוצגים */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
+                <span className="text-sm font-semibold text-gray-700">פרטי המבקש והחדר</span>
+              </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">שמך <span className="text-red-400">*</span></label>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך <span className="text-red-400">*</span></label>
                 <select value={therapistId} onChange={e => setTherapistId(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
                   <option value="">בחר שם...</option>
@@ -519,7 +630,7 @@ export default function NewBookingPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">חדר מבוקש <span className="text-red-400">*</span></label>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">חדר מבוקש <span className="text-red-400">*</span></label>
                 <select value={roomId} onChange={e => setRoomId(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
                   <option value="">בחר חדר...</option>
@@ -534,13 +645,19 @@ export default function NewBookingPage() {
                 {/* Calendar */}
                 {calStep === 'calendar' && (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      {bookingType === 'recurring' ? 'תאריך התחלה לסדרה' : 'תאריך'} <span className="text-red-400">*</span>
-                    </label>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                      <label className="text-sm font-semibold text-gray-700">
+                        {bookingType === 'recurring' ? 'תאריך התחלה לסדרה' : 'בחר תאריך'} <span className="text-red-400">*</span>
+                      </label>
+                    </div>
                     {!roomId ? (
-                      <p className="text-center text-gray-400 text-sm py-6">יש לבחור חדר תחילה</p>
+                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                        <Info size={15} className="shrink-0" />
+                        <span>יש לבחור חדר תחילה כדי לראות זמינות</span>
+                      </div>
                     ) : dataLoading ? (
-                      <p className="text-center text-gray-400 text-sm py-6">טוען...</p>
+                      <p className="text-center text-gray-400 text-sm py-6">טוען זמינות...</p>
                     ) : (
                       <>
                         <div className="flex items-center justify-between mb-4">
@@ -556,9 +673,10 @@ export default function NewBookingPage() {
                           onSelectDate={handleSelectDate}
                           slotDates={slotDates} selectedDate={selectedDate}
                           blockedDates={blockedDates} partialBlockedDates={partialBlockedDates} />
+                        <CalendarLegend />
                         {bookingType === 'recurring' && (
                           <p className="text-xs text-blue-600 text-center mt-3 flex items-center justify-center gap-1">
-                            <Repeat2 size={12}/> בחר תאריך התחלה לסדרה החוזרת
+                            <Repeat2 size={12}/> בחר את התאריך שממנו תתחיל הסדרה החוזרת
                           </p>
                         )}
                       </>
@@ -571,9 +689,12 @@ export default function NewBookingPage() {
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-4">
                     {/* תאריך נבחר + חזור */}
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">{formatDateHe(selectedDate)}</p>
-                        {bookingType === 'recurring' && <p className="text-xs text-blue-500">תאריך התחלה לסדרה</p>}
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">{formatDateHe(selectedDate)}</p>
+                          {bookingType === 'recurring' && <p className="text-xs text-blue-500">תאריך התחלה לסדרה</p>}
+                        </div>
                       </div>
                       <button onClick={() => { setCalStep('calendar'); setStartHour(null); setEndHour(''); setError(''); }}
                         className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
@@ -583,58 +704,75 @@ export default function NewBookingPage() {
 
                     {blockedHoursForDate.size > 0 && (
                       <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-700">
-                        <span>🚫</span><span>חלק מהשעות חסומות בתאריך זה</span>
+                        <span>🚫</span><span>חלק מהשעות חסומות בתאריך זה — שעות אלו יופיעו כמושבתות ברשימה</span>
                       </div>
                     )}
 
                     {/* שעות */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת התחלה</label>
-                        <select value={startHour ?? ''} onChange={e => { setStartHour(parseInt(e.target.value)); setEndHour(''); setError(''); }}
-                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
-                          <option value="">בחר...</option>
-                          {ALL_HOURS.map(h => {
-                            const occ = occupiedHours.has(h), blk = blockedHoursForDate.has(h);
-                            const occupant = daySlots.find(s => h >= s.startHour && h < s.endHour);
-                            return <option key={h} value={h} disabled={occ || blk}>
-                              {hLabel(h)}{blk ? ' — חסום 🚫' : occ ? ` — תפוס (${occupant?.therapist?.name || ''})` : ''}
-                            </option>;
-                          })}
-                        </select>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
+                        <span className="text-sm font-semibold text-gray-700">שעות השיבוץ</span>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת סיום</label>
-                        <select value={endHour} disabled={startHour === null}
-                          onChange={e => { setEndHour(e.target.value); setError(''); }}
-                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white disabled:opacity-40">
-                          <option value="">בחר...</option>
-                          {startHour !== null && [...ALL_HOURS.filter(h => h > startHour), ...(startHour <= 21 ? [22] : [])].map(h => {
-                            const hoursInRange = Array.from({ length: h - startHour }, (_, i) => startHour + i);
-                            const isSelfOcc    = occupiedHours.has(h-1) || blockedHoursForDate.has(h-1);
-                            const hasPrior     = hoursInRange.some(x => occupiedHours.has(x) || blockedHoursForDate.has(x));
-                            return <option key={h} value={h} disabled={hasPrior}>
-                              {hLabel(h)}{isSelfOcc ? ' — חלון זמן תפוס' : hasPrior ? ' — לא ניתן לשבץ' : ''}
-                            </option>;
-                          })}
-                        </select>
+                      <p className="text-xs text-gray-400 mb-3 mr-7">שעות תפוסות או חסומות לא ניתנות לבחירה</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת התחלה <span className="text-red-400">*</span></label>
+                          <select value={startHour ?? ''} onChange={e => { setStartHour(parseInt(e.target.value)); setEndHour(''); setError(''); }}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
+                            <option value="">בחר...</option>
+                            {ALL_HOURS.map(h => {
+                              const occ = occupiedHours.has(h), blk = blockedHoursForDate.has(h);
+                              const occupant = daySlots.find(s => h >= s.startHour && h < s.endHour);
+                              return <option key={h} value={h} disabled={occ || blk}>
+                                {hLabel(h)}{blk ? ' — חסום 🚫' : occ ? ` — תפוס (${occupant?.therapist?.name || ''})` : ''}
+                              </option>;
+                            })}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת סיום <span className="text-red-400">*</span></label>
+                          <select value={endHour} disabled={startHour === null}
+                            onChange={e => { setEndHour(e.target.value); setError(''); }}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white disabled:opacity-40">
+                            <option value="">בחר...</option>
+                            {startHour !== null && [...ALL_HOURS.filter(h => h > startHour), ...(startHour <= 21 ? [22] : [])].map(h => {
+                              const hoursInRange = Array.from({ length: h - startHour }, (_, i) => startHour + i);
+                              const isSelfOcc    = occupiedHours.has(h-1) || blockedHoursForDate.has(h-1);
+                              const hasPrior     = hoursInRange.some(x => occupiedHours.has(x) || blockedHoursForDate.has(x));
+                              return <option key={h} value={h} disabled={hasPrior}>
+                                {hLabel(h)}{isSelfOcc ? ' — חלון זמן תפוס' : hasPrior ? ' — לא ניתן לשבץ' : ''}
+                              </option>;
+                            })}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
                     {/* הערה */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">הערה <span className="text-red-400">*</span></label>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">{bookingType === 'recurring' ? '4' : '4'}</span>
+                        <label className="text-sm font-semibold text-gray-700">הערה <span className="text-red-400">*</span></label>
+                      </div>
+                      <p className="text-xs text-gray-400 mb-2 mr-7">תיאור קצר של מטרת השיבוץ — יוצג למנהל</p>
                       <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} maxLength={200}
-                        placeholder="מידע נוסף..." className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 resize-none" />
+                        placeholder="לדוגמה: פגישת ייעוץ, הערכה ראשונית, קבוצת תמיכה..."
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 resize-none" />
                     </div>
 
                     {/* הגדרות חוזר */}
                     {bookingType === 'recurring' && (
                       <div className="border-t border-gray-100 pt-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold shrink-0">5</span>
+                          <span className="text-sm font-semibold text-gray-700">הגדרות הסדרה החוזרת</span>
+                        </div>
+
                         {/* תדירות */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">תדירות</label>
-                          <div className="flex gap-2 flex-wrap mb-1">
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                          <label className="block text-sm font-semibold text-blue-800 mb-2">תדירות החזרה</label>
+                          <div className="flex gap-2 flex-wrap mb-2">
                             {FREQ_OPTIONS.map(f => (
                               <button key={f.value} type="button" onClick={() => setRecurFrequency(f.value)}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
@@ -642,13 +780,14 @@ export default function NewBookingPage() {
                                 }`}>{f.label}</button>
                             ))}
                           </div>
-                          <p className="text-xs text-gray-400">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.desc}</p>
+                          <p className="text-xs text-blue-600">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.desc}</p>
                         </div>
 
                         {/* ימים בשבוע */}
                         {recurFrequency === 'weekly' && (
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">ימים בשבוע</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">ימים בשבוע <span className="text-red-400">*</span></label>
+                            <p className="text-xs text-gray-400 mb-2">בחר אחד או יותר מהימים שבהם יחזור השיבוץ</p>
                             <div className="flex gap-2">
                               {[0,1,2,3,4,5].map(day => (
                                 <button key={day} type="button"
@@ -663,7 +802,8 @@ export default function NewBookingPage() {
 
                         {/* סיום */}
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">סיום הסדרה</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">מתי מסתיימת הסדרה?</label>
+                          <p className="text-xs text-gray-400 mb-2">ניתן לקבוע לפי מספר פגישות או לפי תאריך אחרון</p>
                           <div className="flex gap-3 mb-3">
                             {['occurrences','date'].map(mode => (
                               <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
@@ -714,19 +854,31 @@ export default function NewBookingPage() {
               <div className="space-y-4">
                 {/* הערה */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">הערה <span className="text-red-400">*</span></label>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                    <label className="text-sm font-semibold text-gray-700">הערה <span className="text-red-400">*</span></label>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2 mr-7">תיאור קצר שיחול על כל השיבוצים ברשימה</p>
                   <input value={note} onChange={e => setNote(e.target.value)} maxLength={200}
-                    placeholder="הערה לכל השיבוצים..."
+                    placeholder="לדוגמה: פגישות ייעוץ, קבוצת תמיכה..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
+                    <span className="text-sm font-semibold text-gray-700">בחר ימים ושעות</span>
+                  </div>
                   {!roomId ? (
-                    <p className="text-center text-gray-400 text-sm py-6">יש לבחור חדר תחילה</p>
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                      <Info size={15} className="shrink-0" />
+                      <span>יש לבחור חדר תחילה כדי לראות זמינות</span>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       {/* לוח */}
                       <div>
+                        <p className="text-xs text-gray-400 mb-2">לחץ על יום להוספה — לחיצה שנייה מסירה אותו</p>
                         <div className="flex items-center justify-between mb-3">
                           <button onClick={nextScatMonth} className="p-1.5 rounded-lg hover:bg-gray-100">
                             <ChevronRight size={18} className="text-gray-500" />
@@ -737,7 +889,7 @@ export default function NewBookingPage() {
                           </button>
                         </div>
                         {dataLoading ? (
-                          <p className="text-center text-gray-400 py-6 text-sm">טוען...</p>
+                          <p className="text-center text-gray-400 py-6 text-sm">טוען זמינות...</p>
                         ) : (
                           <MonthCalendar year={scatterYear} month={scatterMonth}
                             onSelectDate={handleScatterDateClick}
@@ -745,13 +897,15 @@ export default function NewBookingPage() {
                             blockedDates={blockedDates} partialBlockedDates={partialBlockedDates}
                             scatterDates={scatterDates} />
                         )}
+                        <CalendarLegend showScatter />
 
                         {/* עורך שעות inline */}
                         {pendingDate && (
                           <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                            <p className="text-sm font-semibold text-amber-800 mb-3">{formatDateHe(pendingDate)} — בחר שעות</p>
+                            <p className="text-sm font-semibold text-amber-800 mb-1">{formatDateHe(pendingDate)}</p>
+                            <p className="text-xs text-amber-600 mb-3">בחר שעות לתאריך זה ואז לחץ "הוסף לרשימה"</p>
                             {(occupiedHoursForPending.size > 0 || blockedHoursForPending.size > 0) && (
-                              <p className="text-xs text-orange-600 mb-2">⚠️ חלק מהשעות תפוסות/חסומות</p>
+                              <p className="text-xs text-orange-600 mb-2">⚠️ חלק מהשעות תפוסות/חסומות ולא ניתנות לבחירה</p>
                             )}
                             <div className="grid grid-cols-2 gap-2 mb-3">
                               <div>
@@ -794,17 +948,19 @@ export default function NewBookingPage() {
 
                       {/* רשימת תאריכים */}
                       <div className="flex flex-col">
-                        <h3 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
+                        <h3 className="text-sm font-semibold text-gray-600 mb-1 flex items-center gap-1.5">
                           <CalendarRange size={14} className="text-purple-500" />
                           תאריכים שנבחרו
                           {scatterEntries.length > 0 && (
                             <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full">{scatterEntries.length}</span>
                           )}
                         </h3>
+                        <p className="text-xs text-gray-400 mb-3">כל תאריך עם שעות שונות — ניתן להסיר בלחיצה על ✕</p>
                         {scatterEntries.length === 0 ? (
-                          <p className="text-gray-400 text-sm text-center py-8 flex-1 flex items-center justify-center">
-                            לחץ על יום בלוח להוספה
-                          </p>
+                          <div className="text-gray-400 text-sm text-center py-8 flex-1 flex flex-col items-center justify-center gap-2 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                            <CalendarRange size={24} className="text-gray-300" />
+                            <span>לחץ על יום בלוח להוספה</span>
+                          </div>
                         ) : (
                           <div className="space-y-2 max-h-64 overflow-y-auto">
                             {[...scatterEntries].sort((a,b) => a.date.localeCompare(b.date)).map(e => (
