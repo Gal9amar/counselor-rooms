@@ -60,16 +60,21 @@ model ScheduleSlot {
 }
 
 model BookingRequest {
-  id            Int      @id @default(autoincrement())
-  therapistName String
-  roomId        Int
-  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  date          DateTime // midnight UTC
-  startHour     Int
-  endHour       Int
-  note          String?
-  status        String   @default("pending") // "pending" | "approved" | "rejected"
-  createdAt     DateTime @default(now())
+  id               Int       @id @default(autoincrement())
+  therapistName    String
+  roomId           Int
+  room             Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  date             DateTime  // midnight UTC (start date for recurring)
+  startHour        Int
+  endHour          Int
+  note             String?
+  status           String    @default("pending") // "pending" | "approved" | "rejected"
+  bookingType      String    @default("single")  // "single" | "recurring" | "scatter"
+  recurFrequency   String?   // "daily" | "weekly" | "monthly"
+  recurDays        Int[]     // days of week for weekly (0=Sun..6=Sat)
+  recurEndDate     DateTime? // end date option
+  recurOccurrences Int?      // occurrences option
+  createdAt        DateTime  @default(now())
 
   @@index([status])
   @@index([date])

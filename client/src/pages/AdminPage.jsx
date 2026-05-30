@@ -430,11 +430,16 @@ export default function AdminPage(){
     try{
       const res=await approveBookingRequest(req.id,overrides);
       setBookingRequests(p=>p.filter(r=>r.id!==req.id));
-      if(res.slot){setSlots(p=>[...p,res.slot]);}
+      if(res.slots){setSlots(p=>[...p,...res.slots]);}
+      else if(res.slot){setSlots(p=>[...p,res.slot]);}
       setEditRequest(null);
     }catch(e){
-      const msg=e.response?.data?.error||'שגיאה באישור הבקשה';
-      setEditRequestErr(msg);
+      const msg=e.response?.data?.error;
+      try{
+        const parsed=JSON.parse(msg);
+        if(parsed.conflicts)setEditRequestErr(`התנגשות ב-${parsed.conflicts.length} תאריכים`);
+        else setEditRequestErr(msg||'שגיאה באישור הבקשה');
+      }catch{setEditRequestErr(msg||'שגיאה באישור הבקשה');}
     }
   };
   const handleRejectRequest=async(id)=>{

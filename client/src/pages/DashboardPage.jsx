@@ -548,7 +548,7 @@ export default function DashboardPage(){
   const [modalRoom,setModalRoom]=useState(null);
   const [addBookingRoom,setAddBookingRoom]=useState(null);
 
-  const fetchData=async(silent=false)=>{
+  const fetchData=async(silent=false,signal=null)=>{
     try{
       const today=new Date();
       const future=new Date(today);future.setDate(today.getDate()+30);
@@ -559,10 +559,15 @@ export default function DashboardPage(){
       const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:toDateStr(today),to:toDateStr(future)}),fetchNotes(),fetchTherapists()]);
       const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
       setRooms(sortedR);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
-    }catch(e){console.error(e);}finally{setLoading(false);}
+    }catch(e){if(e?.code!=='ERR_CANCELED'&&e?.name!=='AbortError')console.error(e);}finally{setLoading(false);}
   };
 
-  useEffect(()=>{fetchData();const i=setInterval(()=>fetchData(true),60000);return()=>clearInterval(i);},[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    fetchData(false,controller.signal);
+    const i=setInterval(()=>fetchData(true,controller.signal),60000);
+    return()=>{controller.abort();clearInterval(i);};
+  },[]);
 
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;

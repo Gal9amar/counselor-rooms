@@ -59,7 +59,8 @@ counselor-rooms/
         │   ├── DashboardPage.jsx   ← כרטיסי חדרים real-time + modal לוח שנה
         │   ├── SchedulePage.jsx    ← אשף תזמון שנתי
         │   ├── MySchedulePage.jsx  ← לוח אישי למטפל
-        │   └── AdminPage.jsx       ← פאנל ניהול (סיסמה)
+        │   ├── AdminPage.jsx       ← פאנל ניהול (סיסמה)
+        │   └── NewBookingPage.jsx  ← /new-booking – בקשת שיבוץ למטפלים (ללא Layout, URL ישיר)
         └── services/
             └── api.js              ← Axios client + global loading state
 ```
@@ -148,6 +149,17 @@ frequency: "daily" | "weekly" | "monthly" | "yearly"
 daysOfWeek: Int[]   // 0=ראשון ... 5=שישי
 startDate, endDate?, occurrences?
 ```
+
+**BookingRequest**
+```prisma
+id, therapistName, roomId, date, startHour, endHour, note?
+status: "pending" | "approved" | "rejected"
+bookingType: "single" | "recurring" | "scatter"
+recurFrequency?: "daily" | "weekly" | "monthly"
+recurDays: Int[]   // ימי שבוע לשבועי
+recurEndDate?, recurOccurrences?
+```
+אישור recurring → יוצר RecurringSchedule + slots (כמו /api/recurring POST)
 
 **RoomNote**
 ```prisma

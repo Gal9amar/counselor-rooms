@@ -1,5 +1,5 @@
 const prisma = require('./lib/prisma');
-const { ok, err, cors, checkAdmin } = require('./lib/helpers');
+const { ok, err, cors, checkAdmin, toMidnightUTC, toDateStr, generateDates } = require('./lib/helpers');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -25,20 +25,28 @@ exports.handler = async (event) => {
 
     // POST /api/booking-requests (public)
     if (httpMethod === 'POST' && !isIdPath) {
-      const { therapistName, roomId, date, startHour, endHour, note } = JSON.parse(body || '{}');
+      const {
+        therapistName, roomId, date, startHour, endHour, note,
+        bookingType, recurFrequency, recurDays, recurEndMode, recurOccurrences, recurEndDate,
+      } = JSON.parse(body || '{}');
       if (!therapistName || !roomId || !date || startHour == null || endHour == null)
         return err('חסרים שדות חובה', 400);
       if (startHour >= endHour) return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
 
-      const dateObj = new Date(date + 'T00:00:00Z');
+      const isRecurring = bookingType === 'recurring';
       const request = await prisma.bookingRequest.create({
         data: {
           therapistName,
           roomId: parseInt(roomId),
-          date: dateObj,
+          date: toMidnightUTC(date),
           startHour: parseInt(startHour),
           endHour: parseInt(endHour),
           note: note || null,
+          bookingType: bookingType || 'single',
+          recurFrequency: isRecurring ? (recurFrequency || null) : null,
+          recurDays: isRecurring && recurFrequency === 'weekly' ? (recurDays || []) : [],
+          recurEndDate: isRecurring && recurEndDate ? toMidnightUTC(recurEndDate) : null,
+          recurOccurrences: isRecurring && recurOccurrences ? parseInt(recurOccurrences) : null,
         },
         include: { room: { select: { id: true, name: true } } },
       });
@@ -52,18 +60,91 @@ exports.handler = async (event) => {
       const { status, therapistName, roomId, date, startHour, endHour, note } = JSON.parse(body || '{}');
 
       if (status === 'approved') {
-        // בדוק שהחדר לא תפוס
         const reqRecord = await prisma.bookingRequest.findUnique({ where: { id } });
         if (!reqRecord) return err('בקשה לא נמצאה', 404);
 
         const finalRoomId = roomId != null ? parseInt(roomId) : reqRecord.roomId;
-        const finalDate = date ? new Date(date + 'T00:00:00Z') : reqRecord.date;
+        const finalDate = date ? toMidnightUTC(date) : reqRecord.date;
         const finalStart = startHour != null ? parseInt(startHour) : reqRecord.startHour;
         const finalEnd = endHour != null ? parseInt(endHour) : reqRecord.endHour;
         const finalNote = note !== undefined ? note : reqRecord.note;
         const finalTherapistName = therapistName || reqRecord.therapistName;
 
-        // בדיקת חפיפה
+        // מצא או צור therapist לפי שם
+        let therapist = await prisma.therapist.findFirst({ where: { name: finalTherapistName } });
+        if (!therapist) {
+          therapist = await prisma.therapist.create({ data: { name: finalTherapistName } });
+        }
+
+        // אישור שיבוץ חוזר
+        if (reqRecord.bookingType === 'recurring' && reqRecord.recurFrequency) {
+          const startDateStr = toDateStr(reqRecord.date);
+          const endDateStr = reqRecord.recurEndDate ? toDateStr(reqRecord.recurEndDate) : null;
+
+          const dates = generateDates({
+            frequency: reqRecord.recurFrequency,
+            daysOfWeek: reqRecord.recurDays || [],
+            startDate: startDateStr,
+            endDate: endDateStr,
+            occurrences: reqRecord.recurOccurrences || null,
+          });
+          if (dates.length === 0) return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
+
+          // בדיקת חפיפות לכל התאריכים
+          const overlapping = await prisma.scheduleSlot.findMany({
+            where: {
+              roomId: finalRoomId,
+              date: { in: dates },
+              AND: [{ startHour: { lt: finalEnd } }, { endHour: { gt: finalStart } }],
+            },
+            include: { therapist: true },
+          });
+          if (overlapping.length > 0) {
+            const conflicts = overlapping.map(s => ({
+              date: toDateStr(new Date(s.date)),
+              therapist: s.therapist.name,
+              startHour: s.startHour,
+              endHour: s.endHour,
+            }));
+            return err(JSON.stringify({ conflicts }), 409);
+          }
+
+          // צור RecurringSchedule + slots
+          const recurring = await prisma.recurringSchedule.create({
+            data: {
+              roomId: finalRoomId,
+              therapistId: therapist.id,
+              startHour: finalStart,
+              endHour: finalEnd,
+              note: finalNote,
+              frequency: reqRecord.recurFrequency,
+              daysOfWeek: reqRecord.recurDays || [],
+              startDate: toMidnightUTC(startDateStr),
+              endDate: endDateStr ? toMidnightUTC(endDateStr) : null,
+              occurrences: reqRecord.recurOccurrences || null,
+            },
+          });
+          await prisma.scheduleSlot.createMany({
+            data: dates.map(d => ({
+              roomId: finalRoomId,
+              date: d,
+              startHour: finalStart,
+              endHour: finalEnd,
+              therapistId: therapist.id,
+              note: finalNote,
+              recurringId: recurring.id,
+            })),
+          });
+          const createdSlots = await prisma.scheduleSlot.findMany({
+            where: { recurringId: recurring.id },
+            include: { room: true, therapist: true, recurring: true },
+            orderBy: { date: 'asc' },
+          });
+          await prisma.bookingRequest.update({ where: { id }, data: { status: 'approved' } });
+          return ok({ request: { id, status: 'approved' }, slots: createdSlots, recurring });
+        }
+
+        // אישור שיבוץ יחיד / תפזורת
         const conflict = await prisma.scheduleSlot.findFirst({
           where: {
             roomId: finalRoomId,
@@ -74,13 +155,6 @@ exports.handler = async (event) => {
         });
         if (conflict) return err('קיים שיבוץ חופף בחדר זה בשעות אלו', 409);
 
-        // מצא או צור therapist לפי שם
-        let therapist = await prisma.therapist.findFirst({ where: { name: finalTherapistName } });
-        if (!therapist) {
-          therapist = await prisma.therapist.create({ data: { name: finalTherapistName } });
-        }
-
-        // צור slot
         const slot = await prisma.scheduleSlot.create({
           data: {
             roomId: finalRoomId,
@@ -92,10 +166,7 @@ exports.handler = async (event) => {
           },
           include: { room: true, therapist: true },
         });
-
-        // עדכן בקשה לאושרה
         await prisma.bookingRequest.update({ where: { id }, data: { status: 'approved' } });
-
         return ok({ request: { id, status: 'approved' }, slot });
       }
 
