@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { getRooms, getSchedule, getRoomNotes, getTherapists, getScheduleSilent, getRoomsSilent, getTherapistsSilent, getRoomNotesSilentAll } from '../services/api';
 import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import AddBookingModal from '../components/AddBookingModal';
@@ -309,7 +309,7 @@ function RoomCard({room,slots,notes,onClick,index}){
   );
 }
 
-function TimelineView({rooms,slots}){
+function TimelineView({rooms,slots,onEnsureRange}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
   const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
@@ -342,6 +342,17 @@ function TimelineView({rooms,slots}){
 
   function startOfWeek(d){const c=new Date(d);c.setHours(0,0,0,0);c.setDate(c.getDate()-c.getDay());return c;}
   function addDays(d,n){const c=new Date(d);c.setDate(c.getDate()+n);return c;}
+
+  useEffect(()=>{
+    if(!onEnsureRange)return;
+    if(viewMode==='week'){
+      const ws=startOfWeek(viewDate);
+      onEnsureRange(toDateStr(ws),toDateStr(addDays(ws,6)));
+    }else{
+      const ds=toDateStr(viewDate);
+      onEnsureRange(ds,ds);
+    }
+  },[viewDate,viewMode,onEnsureRange]);
 
   const weekStart=startOfWeek(viewDate);
   const weekDays=viewMode==='week'?Array.from({length:7},(_,i)=>addDays(weekStart,i)):[viewDate];
@@ -547,20 +558,35 @@ export default function DashboardPage(){
   const [view,setView]=useState('grid');
   const [modalRoom,setModalRoom]=useState(null);
   const [addBookingRoom,setAddBookingRoom]=useState(null);
+  const loadedFromRef=useRef('');
+  const loadedToRef=useRef('');
 
   const fetchData=async(silent=false,signal=null)=>{
     try{
       const today=new Date();
+      const past=new Date(today);past.setDate(today.getDate()-30);
       const future=new Date(today);future.setDate(today.getDate()+30);
+      const fromStr=toDateStr(past);const toStr=toDateStr(future);
       const fetchRooms=silent?getRoomsSilent:getRooms;
       const fetchSchedule=silent?getScheduleSilent:getSchedule;
       const fetchNotes=silent?getRoomNotesSilentAll:getRoomNotes;
       const fetchTherapists=silent?getTherapistsSilent:getTherapists;
-      const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:toDateStr(today),to:toDateStr(future)}),fetchNotes(),fetchTherapists()]);
+      const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:fromStr,to:toStr}),fetchNotes(),fetchTherapists()]);
       const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
       setRooms(sortedR);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
+      loadedFromRef.current=fromStr;loadedToRef.current=toStr;
     }catch(e){if(e?.code!=='ERR_CANCELED'&&e?.name!=='AbortError')console.error(e);}finally{setLoading(false);}
   };
+
+  const ensureRangeLoaded=useCallback(async(from,to)=>{
+    if(loadedFromRef.current&&from>=loadedFromRef.current&&to<=loadedToRef.current)return;
+    try{
+      const s=await getScheduleSilent({from,to});
+      setSlots(prev=>{const ids=new Set(prev.map(x=>x.id));return[...prev,...s.filter(x=>!ids.has(x.id))];});
+      if(!loadedFromRef.current||from<loadedFromRef.current)loadedFromRef.current=from;
+      if(!loadedToRef.current||to>loadedToRef.current)loadedToRef.current=to;
+    }catch(e){console.error(e);}
+  },[]);
 
   useEffect(()=>{
     const controller=new AbortController();
@@ -610,7 +636,7 @@ export default function DashboardPage(){
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={roomNotes.filter(n=>n.roomId===room.id)} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
-          ):<TimelineView rooms={rooms} slots={slots}/>}
+          ):<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>}
         </>
       )}
       {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)} onAddSlot={(r)=>setAddBookingRoom(r)}/>}
