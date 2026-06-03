@@ -548,6 +548,181 @@ function WhoIsIn({slots}){
   );
 }
 
+function WeeklyCalendarView({rooms,slots,onEnsureRange}){
+  const CAL_COLORS=[
+    {bg:'bg-blue-50',header:'bg-blue-100',label:'text-blue-800',slot:'bg-blue-400',slotText:'text-white',border:'border-blue-200'},
+    {bg:'bg-violet-50',header:'bg-violet-100',label:'text-violet-800',slot:'bg-violet-400',slotText:'text-white',border:'border-violet-200'},
+    {bg:'bg-amber-50',header:'bg-amber-100',label:'text-amber-800',slot:'bg-amber-400',slotText:'text-white',border:'border-amber-200'},
+    {bg:'bg-rose-50',header:'bg-rose-100',label:'text-rose-800',slot:'bg-rose-400',slotText:'text-white',border:'border-rose-200'},
+    {bg:'bg-teal-50',header:'bg-teal-100',label:'text-teal-800',slot:'bg-teal-400',slotText:'text-white',border:'border-teal-200'},
+    {bg:'bg-orange-50',header:'bg-orange-100',label:'text-orange-800',slot:'bg-orange-400',slotText:'text-white',border:'border-orange-200'},
+    {bg:'bg-cyan-50',header:'bg-cyan-100',label:'text-cyan-800',slot:'bg-cyan-400',slotText:'text-white',border:'border-cyan-200'},
+    {bg:'bg-pink-50',header:'bg-pink-100',label:'text-pink-800',slot:'bg-pink-400',slotText:'text-white',border:'border-pink-200'},
+    {bg:'bg-lime-50',header:'bg-lime-100',label:'text-lime-800',slot:'bg-lime-500',slotText:'text-white',border:'border-lime-200'},
+    {bg:'bg-indigo-50',header:'bg-indigo-100',label:'text-indigo-800',slot:'bg-indigo-400',slotText:'text-white',border:'border-indigo-200'},
+    {bg:'bg-emerald-50',header:'bg-emerald-100',label:'text-emerald-800',slot:'bg-emerald-500',slotText:'text-white',border:'border-emerald-200'},
+    {bg:'bg-fuchsia-50',header:'bg-fuchsia-100',label:'text-fuchsia-800',slot:'bg-fuchsia-400',slotText:'text-white',border:'border-fuchsia-200'},
+  ];
+
+  function wAddDays(d,n){const c=new Date(d);c.setDate(c.getDate()+n);return c;}
+  function wStartOfWeek(d){const c=new Date(d);c.setHours(0,0,0,0);c.setDate(c.getDate()-c.getDay());return c;}
+
+  const [weekStart,setWeekStart]=React.useState(()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d;});
+  const [selectedDay,setSelectedDay]=React.useState(null);
+
+  const {dateStr,hour,minute}=getNow();
+  const nowDecimal=hour+minute/60;
+
+  const roomColorMap={};
+  rooms.forEach((r,i)=>{roomColorMap[r.id]=CAL_COLORS[i%CAL_COLORS.length];});
+
+  useEffect(()=>{
+    if(!onEnsureRange)return;
+    onEnsureRange(toDateStr(weekStart),toDateStr(wAddDays(weekStart,6)));
+  },[weekStart,onEnsureRange]);
+
+  const weekDays=Array.from({length:7},(_,i)=>wAddDays(weekStart,i));
+
+  function prevWeek(){setWeekStart(d=>{const c=new Date(d);c.setDate(c.getDate()-7);return c;});setSelectedDay(null);}
+  function nextWeek(){setWeekStart(d=>{const c=new Date(d);c.setDate(c.getDate()+7);return c;});setSelectedDay(null);}
+  function goToday(){setWeekStart(wStartOfWeek(new Date()));setSelectedDay(null);}
+
+  if(selectedDay){
+    const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
+    const toRight=(h)=>`${((h-HOURS[0])/totalHours)*100}%`;
+    const isToday=selectedDay===dateStr;
+    const daySlots=slots.filter(s=>toDateStr(new Date(s.date))===selectedDay);
+    return(
+      <div className="card rounded-2xl overflow-visible fade-up">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white rounded-t-2xl">
+          <button onClick={()=>setSelectedDay(null)}
+            className="flex items-center gap-1 text-green-600 font-semibold text-sm hover:text-green-700 transition-colors">
+            <ChevronRight size={16}/><span>חזרה לשבוע</span>
+          </button>
+          <div className="w-px h-4 bg-gray-200"/>
+          <span className="font-bold text-gray-800">{formatDateHe(selectedDay)}</span>
+          {isToday&&<span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium mr-auto">היום</span>}
+        </div>
+        <div className="flex border-b-2 border-gray-200 bg-gray-50 sticky top-0 z-10">
+          <div className="w-24 shrink-0 px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide">חדר</div>
+          <div className="flex-1 relative h-8">
+            {[8,10,12,14,16,18,20].map(h=>(
+              <div key={h} className="absolute top-0 translate-x-1/2" style={{right:toRight(h)}}>
+                <div className="h-2 border-r border-gray-300 mx-auto w-px mb-0.5"/>
+                <span className="text-xs text-gray-400 font-medium">{h}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-visible divide-y-2 divide-gray-100">
+          {rooms.map(room=>{
+            const col=roomColorMap[room.id]||CAL_COLORS[0];
+            const rSlots=daySlots.filter(s=>s.roomId===room.id).sort((a,b)=>a.startHour-b.startHour);
+            return(
+              <div key={room.id} className={`flex items-stretch ${col.bg}`}>
+                <div className={`w-24 shrink-0 px-3 py-3 flex items-center border-r-2 ${col.border} ${col.header}`}>
+                  <span className={`text-sm font-bold ${col.label}`}>{room.name}</span>
+                </div>
+                <div className="flex-1 relative py-2" style={{minHeight:'52px'}}>
+                  {isToday&&nowDecimal>=HOURS[0]&&nowDecimal<=HOURS[HOURS.length-1]+1&&(
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-20 shadow-sm" style={{right:toRight(nowDecimal)}}/>
+                  )}
+                  {rSlots.map(s=>{
+                    const slotW=((s.endHour-s.startHour)/totalHours)*100;
+                    const isPast=(isToday&&s.endHour<=nowDecimal)||(selectedDay<dateStr);
+                    const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
+                    const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':col.slot+' '+col.slotText;
+                    return(
+                      <div key={s.id}
+                        className={`absolute top-1.5 bottom-1.5 rounded-xl overflow-hidden ${bgClass} z-10`}
+                        style={{right:toRight(s.startHour),width:`${Math.max(slotW,1)}%`,minWidth:'6px'}}>
+                        <div className="px-2 h-full flex flex-col justify-center overflow-hidden">
+                          {slotW>6&&<span className="block text-xs font-bold truncate leading-snug">{s.therapist.name}</span>}
+                          {slotW>14&&<span className="block text-xs truncate leading-snug opacity-80">{s.startHour}:00–{s.endHour}:00</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {rSlots.length===0&&(
+                    <div className="absolute inset-0 flex items-center px-4">
+                      <div className={`w-full border-t border-dashed ${col.border} opacity-50`}/>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-3 px-4 py-3 border-t-2 border-gray-100 bg-gray-50 rounded-b-2xl text-xs text-gray-500">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-green-500 inline-block"/> פעיל עכשיו</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-200 inline-block"/> עבר</span>
+          {isToday&&<span className="flex items-center gap-1.5"><span className="w-0.5 h-4 bg-red-400 inline-block"/> קו עכשיו</span>}
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div className="card rounded-2xl overflow-hidden fade-up">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white">
+        <button onClick={prevWeek} className="btn-ghost p-1.5"><ChevronRight size={18}/></button>
+        <span className="font-bold text-gray-800 text-sm flex-1 text-center">
+          {weekStart.getDate()}/{weekStart.getMonth()+1} – {wAddDays(weekStart,6).getDate()}/{wAddDays(weekStart,6).getMonth()+1}/{wAddDays(weekStart,6).getFullYear()}
+        </span>
+        <button onClick={nextWeek} className="btn-ghost p-1.5"><ChevronLeft size={18}/></button>
+        <button onClick={goToday} className="btn-primary text-xs px-3 py-1.5">היום</button>
+      </div>
+      <div className="overflow-x-auto">
+        <div style={{minWidth:'560px'}}>
+          <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50">
+            {weekDays.map(day=>{
+              const ds=toDateStr(day);
+              const isToday=ds===dateStr;
+              return(
+                <div key={ds} className={`text-center py-2.5 border-r border-gray-100 last:border-r-0 ${isToday?'bg-green-50':''}`}>
+                  <div className="text-xs text-gray-400 font-medium mb-1">{DAYS_HE[day.getDay()]}</div>
+                  <div className={`text-sm font-bold mx-auto w-7 h-7 flex items-center justify-center rounded-full ${isToday?'bg-green-500 text-white':'text-gray-700'}`}>
+                    {day.getDate()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-7" style={{minHeight:'240px'}}>
+            {weekDays.map(day=>{
+              const ds=toDateStr(day);
+              const isToday=ds===dateStr;
+              const daySlots=slots.filter(s=>toDateStr(new Date(s.date))===ds).sort((a,b)=>a.startHour-b.startHour);
+              return(
+                <div key={ds}
+                  onClick={()=>setSelectedDay(ds)}
+                  className={`border-r border-gray-100 last:border-r-0 p-1.5 cursor-pointer hover:bg-gray-50 transition-colors ${isToday?'bg-green-50/30':''}`}>
+                  {daySlots.length===0
+                    ?<div className="py-2 text-center"><span className="text-xs text-gray-200">–</span></div>
+                    :daySlots.map(s=>{
+                        const col=roomColorMap[s.roomId]||CAL_COLORS[0];
+                        return(
+                          <div key={s.id} className={`mb-1 rounded-lg px-1.5 py-1 ${col.header} border ${col.border}`}>
+                            <p className={`text-xs font-bold truncate ${col.label}`}>{s.therapist.name}</p>
+                            <p className={`text-xs truncate opacity-80 ${col.label}`}>{s.room?.name}</p>
+                            <p className={`text-xs font-medium opacity-60 ${col.label}`}>{s.startHour}:00–{s.endHour}:00</p>
+                          </div>
+                        );
+                      })
+                  }
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 rounded-b-2xl text-center text-xs text-gray-400">
+        לחץ על יום לציר הזמן היומי
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage(){
   const [rooms,setRooms]=useState([]);
   const [slots,setSlots]=useState([]);
@@ -620,6 +795,10 @@ export default function DashboardPage(){
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view==='timeline'?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'}`}>
               <List size={14}/> ציר זמן
             </button>
+            <button onClick={()=>setView('weekly')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view==='weekly'?'bg-white shadow-sm text-gray-800':'text-gray-400 hover:text-gray-600'}`}>
+              <CalendarDays size={14}/> יומן שבועי
+            </button>
           </div>
           <button onClick={fetchData} className="btn-ghost p-2 text-gray-400">
             <RefreshCw size={14}/>
@@ -636,7 +815,7 @@ export default function DashboardPage(){
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={roomNotes.filter(n=>n.roomId===room.id)} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
-          ):<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>}
+          ):view==='timeline'?<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>:<WeeklyCalendarView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>}
         </>
       )}
       {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)} onAddSlot={(r)=>setAddBookingRoom(r)}/>}
