@@ -49,8 +49,8 @@ export const getSchedule = ({ roomId, date, from, to } = {}) =>
     },
   }).then((r) => r.data);
 
-export const bookSlot = (roomId, date, startHour, endHour, therapistId, note) =>
-  api.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}) }).then((r) => r.data);
+export const bookSlot = (roomId, date, startHour, endHour, therapistId, note, forcePending) =>
+  api.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}), ...(forcePending ? { forcePending: true } : {}) }).then((r) => r.data);
 
 export const updateSlot = (id, startHour, endHour, therapistId, note, roomId, date) =>
   api.patch(`/schedule/${id}`, { startHour, endHour, therapistId, note: note ?? null, roomId, date }).then((r) => r.data);
@@ -95,6 +95,6 @@ export const getTherapistsSilent = () => silentApi.get('/therapists').then((r) =
 export const getRoomNotesSilentAll = () => silentApi.get('/room-notes').then((r) => r.data);
 export const getRoomNotesSilent = (roomId) =>
   silentApi.get('/room-notes', { params: roomId != null ? { roomId } : {} }).then((r) => r.data);
-export const bookSlotSilent = (roomId, date, startHour, endHour, therapistId, note) =>
-  silentApi.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}) }).then((r) => r.data);
+export const bookSlotSilent = (roomId, date, startHour, endHour, therapistId, note, forcePending) =>
+  silentApi.post('/schedule', { roomId, date, startHour, endHour, therapistId, ...(note ? { note } : {}), ...(forcePending ? { forcePending: true } : {}) }).then((r) => r.data);
 export const bookRecurringSilent = (data) => silentApi.post('/recurring', data).then((r) => r.data);

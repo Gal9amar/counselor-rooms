@@ -159,6 +159,7 @@ export default function SchedulePage() {
   const [recurOccurrences, setRecurOccurrences] = useState(10);
   const [recurEndDate, setRecurEndDate] = useState('');
   const [conflictModal, setConflictModal] = useState(null); // array of conflicts or null
+  const [pendingConflictInfo, setPendingConflictInfo] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [blockingNotes, setBlockingNotes] = useState([]); // notes for selected room
 
@@ -291,8 +292,9 @@ export default function SchedulePage() {
         const data = e.response?.data?.error;
         try {
           const parsed = JSON.parse(data);
-          if (parsed.conflicts) { setConflictModal(parsed.conflicts); }
-          else { setBookError(data || 'שגיאה'); }
+          if (parsed.pendingConflict) setPendingConflictInfo({ type: 'recurring', conflicts: parsed.conflicts });
+          else if (parsed.conflicts) setConflictModal(parsed.conflicts);
+          else setBookError(data || 'שגיאה');
         } catch { setBookError(data || 'שגיאה'); }
       }
     } else {
@@ -301,8 +303,44 @@ export default function SchedulePage() {
         const slot = await bookSlot(selectedRoom.id, selectedDate, startHour, end, parseInt(selectedTherapist), note.trim() || null);
         setDaySlots(p => [...p, slot]); setAllSlots(p => [...p, slot]);
         setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote('');
-      } catch (e) { setBookError(e.response?.data?.error || 'שגיאה'); }
+      } catch (e) {
+        const data = e.response?.data?.error;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.pendingConflict) setPendingConflictInfo({ type: 'single', conflicts: parsed.conflicts });
+          else setBookError(data || 'שגיאה');
+        } catch { setBookError(data || 'שגיאה'); }
+      }
     }
+    setBooking(false);
+  };
+
+  const handleForceBook = async () => {
+    const pci = pendingConflictInfo;
+    setPendingConflictInfo(null);
+    const end = parseInt(endHour);
+    setBooking(true); setBookError('');
+    try {
+      if (pci.type === 'recurring') {
+        const result = await bookRecurring({
+          roomId: selectedRoom.id, therapistId: parseInt(selectedTherapist),
+          startHour, endHour: end, note: note.trim() || null,
+          frequency: recurFrequency,
+          daysOfWeek: recurFrequency === 'weekly' ? recurDays : [],
+          startDate: selectedDate,
+          endDate: recurEndMode === 'date' ? recurEndDate : null,
+          occurrences: recurEndMode === 'occurrences' ? parseInt(recurOccurrences) : null,
+          forcePending: true,
+        });
+        setDaySlots(p => [...p, ...result.slots.filter(s => toDateStr(new Date(s.date)) === selectedDate)]);
+        setAllSlots(p => [...p, ...result.slots]);
+        setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote(''); setIsRecurring(false); setRecurDays([]);
+      } else {
+        const slot = await bookSlot(selectedRoom.id, selectedDate, startHour, end, parseInt(selectedTherapist), note.trim() || null, true);
+        setDaySlots(p => [...p, slot]); setAllSlots(p => [...p, slot]);
+        setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote('');
+      }
+    } catch (e) { setBookError(e.response?.data?.error || 'שגיאה'); }
     setBooking(false);
   };
 
@@ -333,6 +371,28 @@ export default function SchedulePage() {
     <div className="max-w-5xl mx-auto">
       {conflictModal && <ConflictModal conflicts={conflictModal} onClose={() => setConflictModal(null)} />}
       {deleteModal && <DeleteModal slot={deleteModal} onClose={() => setDeleteModal(null)} onDelete={confirmDelete} />}
+      {pendingConflictInfo && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPendingConflictInfo(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-900 mb-2 text-base flex items-center gap-2"><AlertTriangle size={18} className="text-amber-500"/> קיימות בקשות ממתינות לאישור</h3>
+            <p className="text-sm text-gray-600 mb-3">בשעות שנבחרו קיימות הבקשות הבאות הממתינות לאישור מנהל:</p>
+            <div className="space-y-2 mb-4">
+              {pendingConflictInfo.conflicts.map((c, i) => (
+                <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm">
+                  <span className="font-semibold text-amber-800">{c.therapistName}</span>
+                  {c.date && <span className="text-amber-600 text-xs mr-2"> · {c.date}</span>}
+                  <span className="text-amber-600 text-xs"> · {c.startHour}:00–{c.endHour}:00</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-gray-600 mb-4">האם לבצע את השיבוץ בכל זאת?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setPendingConflictInfo(null)} className="flex-1 btn-ghost py-2 text-sm">ביטול</button>
+              <button onClick={handleForceBook} className="flex-1 btn-primary py-2 text-sm">שבץ בכל זאת</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-5 fade-up">

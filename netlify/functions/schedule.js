@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 
     // POST
     if (httpMethod === 'POST') {
-      const { roomId, date, startHour, endHour, therapistId, note } = JSON.parse(body || '{}');
+      const { roomId, date, startHour, endHour, therapistId, note, forcePending } = JSON.parse(body || '{}');
       if (!roomId || !date || startHour == null || endHour == null || !therapistId)
         return err('roomId, date, startHour, endHour, therapistId נדרשים', 400);
       if (endHour <= startHour)
@@ -67,6 +67,18 @@ exports.handler = async (event) => {
       });
       if (overlapping)
         return err(`קיים שיבוץ חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
+
+      if (!forcePending) {
+        const pendingConflicts = await prisma.bookingRequest.findMany({
+          where: { roomId, date: dateUTC, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
+        });
+        if (pendingConflicts.length > 0) {
+          return err(JSON.stringify({
+            pendingConflict: true,
+            conflicts: pendingConflicts.map(r => ({ therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
+          }), 409);
+        }
+      }
 
       const slot = await prisma.scheduleSlot.create({
         data: { roomId, date: dateUTC, startHour, endHour, therapistId, ...(note ? { note } : {}) },

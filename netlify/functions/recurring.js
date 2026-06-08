@@ -20,6 +20,7 @@ exports.handler = async (event) => {
         startDate,
         endDate,
         occurrences,
+        forcePending,
       } = JSON.parse(body || '{}');
 
       // Validate required fields
@@ -55,6 +56,18 @@ exports.handler = async (event) => {
           endHour: s.endHour,
         }));
         return err(JSON.stringify({ conflicts }), 409);
+      }
+
+      if (!forcePending) {
+        const pendingConflicts = await prisma.bookingRequest.findMany({
+          where: { roomId, date: { in: dates }, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
+        });
+        if (pendingConflicts.length > 0) {
+          return err(JSON.stringify({
+            pendingConflict: true,
+            conflicts: pendingConflicts.map(r => ({ date: toDateStr(new Date(r.date)), therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
+          }), 409);
+        }
       }
 
       // Create the RecurringSchedule record
