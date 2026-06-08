@@ -41,13 +41,14 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blo
           const isBlocked = blockedDates?.has(ds);
           const isPartialBlocked = !isBlocked && partialBlockedDates?.has(ds);
           return (
-            <button key={ds} disabled={isPast || isBlocked} onClick={() => !isPast && !isBlocked && onSelectDate(ds)}
+            <button key={ds} disabled={isBlocked} onClick={() => !isBlocked && onSelectDate(ds)}
               title={isBlocked ? 'חדר חסום' : isPartialBlocked ? 'חלק מהשעות חסומות' : ''}
               className={`relative rounded-xl py-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5 ${
                 isSelected ? 'bg-green-500 text-white shadow-md shadow-green-200'
                 : isBlocked ? 'bg-red-100 text-red-400 border border-red-200 cursor-not-allowed'
                 : isToday ? 'bg-green-100 text-green-700 font-bold ring-1 ring-green-300'
-                : isPast ? 'text-gray-200 cursor-not-allowed'
+                : isPast && hasSlot ? 'bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100 cursor-pointer'
+                : isPast ? 'text-gray-300 hover:bg-gray-50 cursor-pointer'
                 : isPartialBlocked ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
                 : hasSlot ? 'bg-green-50 text-green-700 border border-green-200'
                 : 'text-gray-500 hover:bg-gray-50'
@@ -55,7 +56,7 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blo
               {day}
               {isBlocked && <span className="text-xs leading-none">🚫</span>}
               {isPartialBlocked && !isBlocked && <span className="text-xs leading-none">⚠️</span>}
-              {hasSlot && !isPast && !isBlocked && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-green-400'}`} />}
+              {hasSlot && !isBlocked && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : isPast ? 'bg-gray-400' : 'bg-green-400'}`} />}
             </button>
           );
         })}
@@ -202,6 +203,12 @@ export default function SchedulePage() {
     const ny = Math.max(...years) + 1;
     setYears(p => [...p, ny]); setFilterYear(ny); setFilterMonth(null);
     const s = await getSchedule({ roomId: selectedRoom.id, from: `${ny}-01-01`, to: `${ny}-12-31` });
+    setAllSlots(p => [...p, ...s]);
+  };
+  const handleAddPastYear = async () => {
+    const py = Math.min(...years) - 1;
+    setYears(p => [...p, py].sort((a,b)=>a-b)); setFilterYear(py); setFilterMonth(null);
+    const s = await getSchedule({ roomId: selectedRoom.id, from: `${py}-01-01`, to: `${py}-12-31` });
     setAllSlots(p => [...p, ...s]);
   };
   const back = () => {
@@ -478,7 +485,8 @@ export default function SchedulePage() {
             </button>
           </div>
           <div className="flex gap-2 mb-5 flex-wrap">
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+            <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-0.5">
+              <button onClick={handleAddPastYear} className="px-2 py-1.5 rounded-lg text-sm text-gray-400 hover:text-gray-600 hover:bg-white transition-all" title="שנה קודמת"><ChevronRight size={15}/></button>
               {years.map(y => (
                 <button key={y} onClick={() => { setFilterYear(y); setFilterMonth(null); }}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filterYear === y ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>{y}</button>
@@ -492,8 +500,6 @@ export default function SchedulePage() {
           </div>
           <div className={`grid gap-4 ${filterMonth !== null ? 'grid-cols-1 max-w-sm' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
             {monthsToShow.map(month => {
-              const lastDay = new Date(filterYear, month + 1, 0);
-              if (lastDay < today) return null;
               return (
                 <div key={month} className="card rounded-2xl p-4">
                   <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">{MONTHS_HE[month]} {filterYear}</h3>
@@ -510,6 +516,26 @@ export default function SchedulePage() {
         <div className="fade-up">
           <h1 className="section-title mb-1">{selectedRoom.name}</h1>
           <p className="text-green-600 font-medium text-sm mb-5">{formatDateHe(selectedDate)}</p>
+          {new Date(selectedDate+'T00:00:00') < today ? (
+            <div className="card rounded-2xl p-5 fade-up">
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3">היסטוריית שיבוצים</p>
+              {daySlots.length === 0
+                ? <p className="text-gray-400 text-sm text-center py-4">אין שיבוצים ביום זה</p>
+                : <div className="space-y-2">
+                    {[...daySlots].sort((a,b)=>a.startHour-b.startHour).map(s=>(
+                      <div key={s.id} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-gray-300 inline-block"/>
+                          <span className="text-sm font-semibold text-gray-700">{s.therapist.name}</span>
+                          {s.note && <span className="text-xs text-gray-400 italic truncate max-w-32">· {s.note}</span>}
+                        </div>
+                        <span className="text-sm text-gray-500 font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+          ) : (<>
           <p className="text-gray-500 text-sm mb-3">בחר שעת התחלה</p>
           {blockedHoursForDate.size > 0 && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-4 text-sm text-red-700">
@@ -711,6 +737,7 @@ export default function SchedulePage() {
               </div>
             </div>
           )}
+          </>)}
         </div>
       )}
     </div>
