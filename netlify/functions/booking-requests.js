@@ -152,8 +152,12 @@ exports.handler = async (event) => {
             startHour: { lt: finalEnd },
             endHour: { gt: finalStart },
           },
+          include: { therapist: true },
         });
-        if (conflict) return err('קיים שיבוץ חופף בחדר זה בשעות אלו', 409);
+        if (conflict) return err(
+          JSON.stringify({ conflicts: [{ date: toDateStr(new Date(finalDate)), therapist: conflict.therapist.name, startHour: conflict.startHour, endHour: conflict.endHour }] }),
+          409
+        );
 
         const slot = await prisma.scheduleSlot.create({
           data: {

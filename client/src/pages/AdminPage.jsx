@@ -435,11 +435,19 @@ export default function AdminPage(){
       setEditRequest(null);
     }catch(e){
       const msg=e.response?.data?.error;
+      let errText;
       try{
         const parsed=JSON.parse(msg);
-        if(parsed.conflicts)setEditRequestErr(`התנגשות ב-${parsed.conflicts.length} תאריכים`);
-        else setEditRequestErr(msg||'שגיאה באישור הבקשה');
-      }catch{setEditRequestErr(msg||'שגיאה באישור הבקשה');}
+        if(parsed.conflicts&&parsed.conflicts.length===1){
+          const c=parsed.conflicts[0];
+          errText=`החדר כבר תפוס ע"י ${c.therapist} (${c.startHour}:00–${c.endHour}:00) — יש לשנות שעה, תאריך או חדר`;
+        }else if(parsed.conflicts){
+          errText=`התנגשות ב-${parsed.conflicts.length} תאריכים — יש לשנות שעה, תאריך או חדר`;
+        }
+        else errText=msg||'שגיאה באישור הבקשה';
+      }catch{errText=msg||'שגיאה באישור הבקשה';}
+      if(!editRequest){openEditRequest(req);}
+      setEditRequestErr(errText);
     }
   };
   const handleRejectRequest=async(id)=>{
