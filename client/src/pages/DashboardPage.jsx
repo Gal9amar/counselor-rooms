@@ -569,6 +569,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
 
   const [weekStart,setWeekStart]=React.useState(()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d;});
   const [selectedDay,setSelectedDay]=React.useState(null);
+  const [expandedSlot,setExpandedSlot]=React.useState(null);
 
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
@@ -593,7 +594,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
     const isToday=selectedDay===dateStr;
     const daySlots=slots.filter(s=>toDateStr(new Date(s.date))===selectedDay);
     return(
-      <div className="card rounded-2xl overflow-visible fade-up">
+      <div className="card rounded-2xl overflow-visible fade-up" onClick={()=>setExpandedSlot(null)}>
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white rounded-t-2xl">
           <button onClick={()=>setSelectedDay(null)}
             className="flex items-center gap-1 text-green-600 font-semibold text-sm hover:text-green-700 transition-colors">
@@ -632,14 +633,26 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
                     const isPast=(isToday&&s.endHour<=nowDecimal)||(selectedDay<dateStr);
                     const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
                     const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':col.slot+' '+col.slotText;
+                    const isExp=expandedSlot===s.id;
                     return(
                       <div key={s.id}
-                        className={`absolute top-1.5 bottom-1.5 rounded-xl overflow-hidden ${bgClass} z-10`}
-                        style={{right:toRight(s.startHour),width:`${Math.max(slotW,1)}%`,minWidth:'6px'}}>
+                        className={`absolute top-1.5 bottom-1.5 rounded-xl overflow-visible cursor-pointer transition-all ${bgClass} ${isExp?'z-30 shadow-xl':'z-10 hover:brightness-95'}`}
+                        style={{right:toRight(s.startHour),width:`${Math.max(slotW,1)}%`,minWidth:'6px'}}
+                        onClick={e=>{e.stopPropagation();setExpandedSlot(isExp?null:s.id);}}>
                         <div className="px-2 h-full flex flex-col justify-center overflow-hidden">
                           {slotW>6&&<span className="block text-xs font-bold truncate leading-snug">{s.therapist.name}</span>}
                           {slotW>14&&<span className="block text-xs truncate leading-snug opacity-80">{s.startHour}:00–{s.endHour}:00</span>}
                         </div>
+                        {isExp&&(
+                          <div className="absolute right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 w-56 z-50"
+                            style={{bottom:'calc(100% + 8px)'}} dir="rtl">
+                            <div className={`text-xs font-bold px-2 py-1 rounded-lg mb-3 ${col.header} ${col.label}`}>{room.name}</div>
+                            <p className="font-bold text-gray-900 mb-2">{s.therapist.name}</p>
+                            <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00 – {s.endHour}:00</p>
+                            <p className="text-xs text-gray-400 mb-1">משך: {s.endHour-s.startHour} שעות</p>
+                            {s.note&&<p className="text-xs text-gray-600 italic border-t border-gray-100 pt-2 mt-2">📝 {s.note}</p>}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -657,6 +670,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-green-500 inline-block"/> פעיל עכשיו</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-200 inline-block"/> עבר</span>
           {isToday&&<span className="flex items-center gap-1.5"><span className="w-0.5 h-4 bg-red-400 inline-block"/> קו עכשיו</span>}
+          <span className="flex items-center gap-1.5 mr-auto font-medium text-green-600">👆 לחץ על שיבוץ לפרטים</span>
         </div>
       </div>
     );
@@ -706,6 +720,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
                             <p className={`text-xs font-bold truncate ${col.label}`}>{s.therapist.name}</p>
                             <p className={`text-xs truncate opacity-80 ${col.label}`}>{s.room?.name}</p>
                             <p className={`text-xs font-medium opacity-60 ${col.label}`}>{s.startHour}:00–{s.endHour}:00</p>
+                            {s.note&&<p className={`text-xs italic opacity-60 ${col.label} truncate mt-0.5`}>📝 {s.note}</p>}
                           </div>
                         );
                       })
