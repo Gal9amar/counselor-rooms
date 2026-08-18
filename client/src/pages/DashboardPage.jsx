@@ -6,6 +6,20 @@ import AddBookingModal from '../components/AddBookingModal';
 const HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const MONTHS_HE=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const ROOM_COLORS=[
+  {bg:'bg-blue-50',header:'bg-blue-100',label:'text-blue-800',slot:'bg-blue-400',slotText:'text-white',border:'border-blue-200'},
+  {bg:'bg-violet-50',header:'bg-violet-100',label:'text-violet-800',slot:'bg-violet-400',slotText:'text-white',border:'border-violet-200'},
+  {bg:'bg-amber-50',header:'bg-amber-100',label:'text-amber-800',slot:'bg-amber-400',slotText:'text-white',border:'border-amber-200'},
+  {bg:'bg-rose-50',header:'bg-rose-100',label:'text-rose-800',slot:'bg-rose-400',slotText:'text-white',border:'border-rose-200'},
+  {bg:'bg-teal-50',header:'bg-teal-100',label:'text-teal-800',slot:'bg-teal-400',slotText:'text-white',border:'border-teal-200'},
+  {bg:'bg-orange-50',header:'bg-orange-100',label:'text-orange-800',slot:'bg-orange-400',slotText:'text-white',border:'border-orange-200'},
+  {bg:'bg-cyan-50',header:'bg-cyan-100',label:'text-cyan-800',slot:'bg-cyan-400',slotText:'text-white',border:'border-cyan-200'},
+  {bg:'bg-pink-50',header:'bg-pink-100',label:'text-pink-800',slot:'bg-pink-400',slotText:'text-white',border:'border-pink-200'},
+  {bg:'bg-lime-50',header:'bg-lime-100',label:'text-lime-800',slot:'bg-lime-500',slotText:'text-white',border:'border-lime-200'},
+  {bg:'bg-indigo-50',header:'bg-indigo-100',label:'text-indigo-800',slot:'bg-indigo-400',slotText:'text-white',border:'border-indigo-200'},
+  {bg:'bg-emerald-50',header:'bg-emerald-100',label:'text-emerald-800',slot:'bg-emerald-500',slotText:'text-white',border:'border-emerald-200'},
+  {bg:'bg-fuchsia-50',header:'bg-fuchsia-100',label:'text-fuchsia-800',slot:'bg-fuchsia-400',slotText:'text-white',border:'border-fuchsia-200'},
+];
 
 function toDateStr(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -178,7 +192,7 @@ function RoomModal({room,onClose,onAddSlot}){
 }
 
 
-function RoomCard({room,slots,notes,onClick,index}){
+const RoomCard=React.memo(function RoomCard({room,slots,notes,onClick,index}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
 
@@ -307,7 +321,7 @@ function RoomCard({room,slots,notes,onClick,index}){
       </div>
     </button>
   );
-}
+});
 
 function TimelineView({rooms,slots,onEnsureRange}){
   const {dateStr,hour,minute}=getNow();
@@ -321,22 +335,6 @@ function TimelineView({rooms,slots,onEnsureRange}){
 
   const today=new Date();today.setHours(0,0,0,0);
 
-  // Room color palette
-  const ROOM_COLORS=[
-    {bg:'bg-blue-50',header:'bg-blue-100',label:'text-blue-800',slot:'bg-blue-400',slotText:'text-white',border:'border-blue-200'},
-    {bg:'bg-violet-50',header:'bg-violet-100',label:'text-violet-800',slot:'bg-violet-400',slotText:'text-white',border:'border-violet-200'},
-    {bg:'bg-amber-50',header:'bg-amber-100',label:'text-amber-800',slot:'bg-amber-400',slotText:'text-white',border:'border-amber-200'},
-    {bg:'bg-rose-50',header:'bg-rose-100',label:'text-rose-800',slot:'bg-rose-400',slotText:'text-white',border:'border-rose-200'},
-    {bg:'bg-teal-50',header:'bg-teal-100',label:'text-teal-800',slot:'bg-teal-400',slotText:'text-white',border:'border-teal-200'},
-    {bg:'bg-orange-50',header:'bg-orange-100',label:'text-orange-800',slot:'bg-orange-400',slotText:'text-white',border:'border-orange-200'},
-    {bg:'bg-cyan-50',header:'bg-cyan-100',label:'text-cyan-800',slot:'bg-cyan-400',slotText:'text-white',border:'border-cyan-200'},
-    {bg:'bg-pink-50',header:'bg-pink-100',label:'text-pink-800',slot:'bg-pink-400',slotText:'text-white',border:'border-pink-200'},
-    {bg:'bg-lime-50',header:'bg-lime-100',label:'text-lime-800',slot:'bg-lime-500',slotText:'text-white',border:'border-lime-200'},
-    {bg:'bg-indigo-50',header:'bg-indigo-100',label:'text-indigo-800',slot:'bg-indigo-400',slotText:'text-white',border:'border-indigo-200'},
-    {bg:'bg-emerald-50',header:'bg-emerald-100',label:'text-emerald-800',slot:'bg-emerald-500',slotText:'text-white',border:'border-emerald-200'},
-    {bg:'bg-fuchsia-50',header:'bg-fuchsia-100',label:'text-fuchsia-800',slot:'bg-fuchsia-400',slotText:'text-white',border:'border-fuchsia-200'},
-  ];
-  // Map room id → color index
   const roomColorMap={};
   rooms.forEach((r,i)=>{roomColorMap[r.id]=ROOM_COLORS[i%ROOM_COLORS.length];});
 
@@ -549,20 +547,6 @@ function WhoIsIn({slots}){
 }
 
 function WeeklyCalendarView({rooms,slots,onEnsureRange}){
-  const CAL_COLORS=[
-    {bg:'bg-blue-50',header:'bg-blue-100',label:'text-blue-800',slot:'bg-blue-400',slotText:'text-white',border:'border-blue-200'},
-    {bg:'bg-violet-50',header:'bg-violet-100',label:'text-violet-800',slot:'bg-violet-400',slotText:'text-white',border:'border-violet-200'},
-    {bg:'bg-amber-50',header:'bg-amber-100',label:'text-amber-800',slot:'bg-amber-400',slotText:'text-white',border:'border-amber-200'},
-    {bg:'bg-rose-50',header:'bg-rose-100',label:'text-rose-800',slot:'bg-rose-400',slotText:'text-white',border:'border-rose-200'},
-    {bg:'bg-teal-50',header:'bg-teal-100',label:'text-teal-800',slot:'bg-teal-400',slotText:'text-white',border:'border-teal-200'},
-    {bg:'bg-orange-50',header:'bg-orange-100',label:'text-orange-800',slot:'bg-orange-400',slotText:'text-white',border:'border-orange-200'},
-    {bg:'bg-cyan-50',header:'bg-cyan-100',label:'text-cyan-800',slot:'bg-cyan-400',slotText:'text-white',border:'border-cyan-200'},
-    {bg:'bg-pink-50',header:'bg-pink-100',label:'text-pink-800',slot:'bg-pink-400',slotText:'text-white',border:'border-pink-200'},
-    {bg:'bg-lime-50',header:'bg-lime-100',label:'text-lime-800',slot:'bg-lime-500',slotText:'text-white',border:'border-lime-200'},
-    {bg:'bg-indigo-50',header:'bg-indigo-100',label:'text-indigo-800',slot:'bg-indigo-400',slotText:'text-white',border:'border-indigo-200'},
-    {bg:'bg-emerald-50',header:'bg-emerald-100',label:'text-emerald-800',slot:'bg-emerald-500',slotText:'text-white',border:'border-emerald-200'},
-    {bg:'bg-fuchsia-50',header:'bg-fuchsia-100',label:'text-fuchsia-800',slot:'bg-fuchsia-400',slotText:'text-white',border:'border-fuchsia-200'},
-  ];
 
   function wAddDays(d,n){const c=new Date(d);c.setDate(c.getDate()+n);return c;}
   function wStartOfWeek(d){const c=new Date(d);c.setHours(0,0,0,0);c.setDate(c.getDate()-c.getDay());return c;}
@@ -575,7 +559,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
   const nowDecimal=hour+minute/60;
 
   const roomColorMap={};
-  rooms.forEach((r,i)=>{roomColorMap[r.id]=CAL_COLORS[i%CAL_COLORS.length];});
+  rooms.forEach((r,i)=>{roomColorMap[r.id]=ROOM_COLORS[i%ROOM_COLORS.length];});
 
   useEffect(()=>{
     if(!onEnsureRange)return;
@@ -617,7 +601,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
         </div>
         <div className="overflow-visible divide-y-2 divide-gray-100">
           {rooms.map(room=>{
-            const col=roomColorMap[room.id]||CAL_COLORS[0];
+            const col=roomColorMap[room.id]||ROOM_COLORS[0];
             const rSlots=daySlots.filter(s=>s.roomId===room.id).sort((a,b)=>a.startHour-b.startHour);
             return(
               <div key={room.id} className={`flex items-stretch ${col.bg}`}>
@@ -714,7 +698,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
                   {daySlots.length===0
                     ?<div className="py-2 text-center"><span className="text-xs text-gray-200">–</span></div>
                     :daySlots.map(s=>{
-                        const col=roomColorMap[s.roomId]||CAL_COLORS[0];
+                        const col=roomColorMap[s.roomId]||ROOM_COLORS[0];
                         return(
                           <div key={s.id} className={`mb-1 rounded-lg px-1.5 py-1 ${col.header} border ${col.border}`}>
                             <p className={`text-xs font-bold truncate ${col.label}`}>{s.therapist.name}</p>
@@ -754,7 +738,7 @@ export default function DashboardPage(){
   const fetchData=async(silent=false,signal=null)=>{
     try{
       const today=new Date();
-      const past=new Date(today);past.setDate(today.getDate()-30);
+      const past=new Date(today);past.setDate(today.getDate()-7);
       const future=new Date(today);future.setDate(today.getDate()+30);
       const fromStr=toDateStr(past);const toStr=toDateStr(future);
       const fetchRooms=silent?getRoomsSilent:getRooms;
@@ -762,8 +746,7 @@ export default function DashboardPage(){
       const fetchNotes=silent?getRoomNotesSilentAll:getRoomNotes;
       const fetchTherapists=silent?getTherapistsSilent:getTherapists;
       const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:fromStr,to:toStr}),fetchNotes(),fetchTherapists()]);
-      const sortedR=[...r].sort((a,b)=>(parseInt(a.name.replace(/\D/g,""))||0)-(parseInt(b.name.replace(/\D/g,""))||0));
-      setRooms(sortedR);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
+      setRooms(r);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
       loadedFromRef.current=fromStr;loadedToRef.current=toStr;
     }catch(e){if(e?.code!=='ERR_CANCELED'&&e?.name!=='AbortError')console.error(e);}finally{setLoading(false);}
   };
@@ -784,6 +767,12 @@ export default function DashboardPage(){
     const i=setInterval(()=>fetchData(true,controller.signal),60000);
     return()=>{controller.abort();clearInterval(i);};
   },[]);
+
+  const notesPerRoom=React.useMemo(()=>{
+    const map={};
+    roomNotes.forEach(n=>{if(!map[n.roomId])map[n.roomId]=[];map[n.roomId].push(n);});
+    return map;
+  },[roomNotes]);
 
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
@@ -828,7 +817,7 @@ export default function DashboardPage(){
             rooms.length===0
               ?<div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={roomNotes.filter(n=>n.roomId===room.id)} index={i} onClick={()=>setModalRoom(room)}/>)}
+                {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={notesPerRoom[room.id]||[]} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
           ):view==='timeline'?<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>:<WeeklyCalendarView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>}
         </>

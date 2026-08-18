@@ -32,9 +32,9 @@ exports.handler = async (event) => {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { ids } = JSON.parse(body || '{}');
       if (!Array.isArray(ids)) return err('ids נדרש', 400);
-      await Promise.all(ids.map((id, index) =>
-        prisma.room.update({ where: { id }, data: { order: index } })
-      ));
+      await prisma.$transaction(
+        ids.map((id, index) => prisma.room.update({ where: { id }, data: { order: index } }))
+      );
       const rooms = await prisma.room.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
       return ok(rooms);
     }
