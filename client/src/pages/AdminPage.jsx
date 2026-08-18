@@ -149,6 +149,10 @@ export default function AdminPage(){
   const [editRequest,setEditRequest]=useState(null); // {id, therapistName, roomId, date, startHour, endHour, note}
   const [editRequestErr,setEditRequestErr]=useState('');
   const [editRequestSaving,setEditRequestSaving]=useState(false);
+  const [holidayModal,setHolidayModal]=useState(false);
+  const [holidayForm,setHolidayForm]=useState({message:'',startDate:'',endDate:''});
+  const [holidaySaving,setHolidaySaving]=useState(false);
+  const [holidayError,setHolidayError]=useState('');
 
   const loadRequests=async()=>{
     setRequestsLoading(true);
@@ -194,6 +198,36 @@ export default function AdminPage(){
   const removeNote=async(id)=>{
     try{await deleteRoomNote(id);setRoomNotes(p=>p.filter(n=>n.id!==id));}
     catch(e){setError(e.response?.data?.error||'שגיאה');}
+  };
+
+  const saveHoliday=async()=>{
+    const {message,startDate,endDate}=holidayForm;
+    if(!message.trim()||!startDate||!endDate){setHolidayError('יש למלא שם החג/חופשה ותאריכים');return;}
+    if(endDate<startDate){setHolidayError('תאריך הסיום חייב להיות לאחר תאריך ההתחלה');return;}
+    if(rooms.length===0){setHolidayError('אין חדרים להחיל עליהם את החסימה');return;}
+    setHolidaySaving(true);setHolidayError('');
+    try{
+      const newNotes=await Promise.all(
+        rooms.map(r=>addRoomNote({roomId:r.id,message:message.trim(),startDate,endDate,startHour:null,endHour:null,blocksBooking:true}))
+      );
+      setRoomNotes(p=>[...p,...newNotes]);
+      setHolidayModal(false);
+      setHolidayForm({message:'',startDate:'',endDate:''});
+    }catch(e){setHolidayError(e.response?.data?.error||'שגיאה');}
+    finally{setHolidaySaving(false);}
+  };
+
+  const removeHolidayGroup=async(message,startDate,endDate)=>{
+    const toDelete=roomNotes.filter(n=>
+      n.blocksBooking&&n.message===message&&
+      toDateStr(new Date(n.startDate))===startDate&&
+      toDateStr(new Date(n.endDate))===endDate
+    );
+    try{
+      await Promise.all(toDelete.map(n=>deleteRoomNote(n.id)));
+      const deletedIds=new Set(toDelete.map(n=>n.id));
+      setRoomNotes(p=>p.filter(n=>!deletedIds.has(n.id)));
+    }catch(e){setError(e.response?.data?.error||'שגיאה');}
   };
 
   const renR=async(id,n)=>{try{await updateRoom(id,n);setRooms(p=>p.map(r=>r.id===id?{...r,name:n}:r));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
@@ -801,6 +835,43 @@ export default function AdminPage(){
           </div>
         </div>
       )}
+      {holidayModal&&(
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setHolidayModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">🗓️ הוספת חג / חופשה</h3>
+              <button onClick={()=>setHolidayModal(false)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">חסימה זו תחול על כל {rooms.length} החדרים בו-זמנית</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שם החג / החופשה</label>
+                <input className="input py-2 text-sm" placeholder='למשל: "חג פסח", "חופשת קיץ"'
+                  value={holidayForm.message} onChange={e=>setHolidayForm(p=>({...p,message:e.target.value}))} maxLength={200}/>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">מתאריך</label>
+                  <input type="date" dir="ltr" className="input py-2 text-sm"
+                    value={holidayForm.startDate} onChange={e=>setHolidayForm(p=>({...p,startDate:e.target.value}))}/>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">עד תאריך</label>
+                  <input type="date" dir="ltr" className="input py-2 text-sm"
+                    value={holidayForm.endDate} onChange={e=>setHolidayForm(p=>({...p,endDate:e.target.value}))}/>
+                </div>
+              </div>
+              {holidayError&&<p className="text-red-500 text-xs">{holidayError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={saveHoliday} disabled={holidaySaving} className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-1.5">
+                  {holidaySaving?'שומר...':'חסום את כל החדרים'}
+                </button>
+                <button onClick={()=>setHolidayModal(false)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {noteModal&&(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setNoteModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
@@ -930,6 +1001,43 @@ export default function AdminPage(){
 
       {tab==='rooms'&&(
         <div className="space-y-4">
+          {/* Holidays section */}
+          {(()=>{
+            const groups={};
+            roomNotes.filter(n=>n.blocksBooking).forEach(n=>{
+              const sd=toDateStr(new Date(n.startDate));
+              const ed=toDateStr(new Date(n.endDate));
+              const key=`${n.message}|||${sd}|||${ed}`;
+              if(!groups[key])groups[key]={message:n.message,startDate:sd,endDate:ed,count:0};
+              groups[key].count++;
+            });
+            const holidays=Object.values(groups);
+            return(
+              <div className="card rounded-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-700 text-sm flex items-center gap-1.5">🗓️ ימי חג / חופשות</span>
+                  <button onClick={()=>{setHolidayModal(true);setHolidayForm({message:'',startDate:'',endDate:''});setHolidayError('');}}
+                    className="flex items-center gap-1 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors">
+                    <Plus size={13}/> הוסף חג / חופשה
+                  </button>
+                </div>
+                {holidays.length===0&&<p className="text-gray-400 text-sm text-center py-4">אין חגים / חופשות מוגדרים</p>}
+                {holidays.map(({message,startDate,endDate,count})=>(
+                  <div key={`${message}|||${startDate}|||${endDate}`} className="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-0">
+                    <div>
+                      <p className="font-medium text-gray-700 text-sm">{message}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(startDate+'T00:00:00').toLocaleDateString('he-IL')} – {new Date(endDate+'T00:00:00').toLocaleDateString('he-IL')}
+                        <span className="mr-2 text-red-500 font-semibold">· {count} חדרים חסומים</span>
+                      </p>
+                    </div>
+                    <button onClick={()=>removeHolidayGroup(message,startDate,endDate)}
+                      className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0"><X size={16}/></button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div className="flex gap-2">
             <input type="text" placeholder="שם חדר חדש" className="input" value={newRoom}
               onChange={e=>setNewRoom(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addR()}/>
