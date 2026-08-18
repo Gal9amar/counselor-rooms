@@ -323,7 +323,7 @@ const RoomCard=React.memo(function RoomCard({room,slots,notes,onClick,index}){
   );
 });
 
-function TimelineView({rooms,slots,onEnsureRange}){
+function TimelineView({rooms,slots,onEnsureRange,therapistColorMap={}}){
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
   const totalHours=HOURS[HOURS.length-1]+1-HOURS[0];
@@ -364,7 +364,8 @@ function TimelineView({rooms,slots,onEnsureRange}){
 
   function SlotBlock({s,isNow,isPast,slotW,col}){
     const isExpanded=expandedSlot===s.id;
-    const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':col.slot+' '+col.slotText;
+    const tCol=therapistColorMap[s.therapistId]||col;
+    const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':tCol.slot+' '+tCol.slotText;
     return(
       <div
         className={`absolute top-1.5 bottom-1.5 rounded-xl overflow-visible cursor-pointer transition-all ${bgClass} ${isExpanded?'z-30 shadow-xl':'z-10 hover:brightness-95'}`}
@@ -546,7 +547,7 @@ function WhoIsIn({slots}){
   );
 }
 
-function WeeklyCalendarView({rooms,slots,onEnsureRange}){
+function WeeklyCalendarView({rooms,slots,onEnsureRange,therapistColorMap={}}){
 
   function wAddDays(d,n){const c=new Date(d);c.setDate(c.getDate()+n);return c;}
   function wStartOfWeek(d){const c=new Date(d);c.setHours(0,0,0,0);c.setDate(c.getDate()-c.getDay());return c;}
@@ -616,7 +617,8 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
                     const slotW=((s.endHour-s.startHour)/totalHours)*100;
                     const isPast=(isToday&&s.endHour<=nowDecimal)||(selectedDay<dateStr);
                     const isNow=isToday&&nowDecimal>=s.startHour&&nowDecimal<s.endHour;
-                    const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':col.slot+' '+col.slotText;
+                    const tCol=therapistColorMap[s.therapistId]||col;
+                    const bgClass=isNow?'bg-green-500 text-white shadow-lg shadow-green-300':isPast?'bg-gray-200 text-gray-400':tCol.slot+' '+tCol.slotText;
                     const isExp=expandedSlot===s.id;
                     return(
                       <div key={s.id}
@@ -698,7 +700,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange}){
                   {daySlots.length===0
                     ?<div className="py-2 text-center"><span className="text-xs text-gray-200">–</span></div>
                     :daySlots.map(s=>{
-                        const col=roomColorMap[s.roomId]||ROOM_COLORS[0];
+                        const col=therapistColorMap[s.therapistId]||roomColorMap[s.roomId]||ROOM_COLORS[0];
                         return(
                           <div key={s.id} className={`mb-1 rounded-lg px-1.5 py-1 ${col.header} border ${col.border}`}>
                             <p className={`text-xs font-bold truncate ${col.label}`}>{s.therapist.name}</p>
@@ -774,6 +776,12 @@ export default function DashboardPage(){
     return map;
   },[roomNotes]);
 
+  const therapistColorMap=React.useMemo(()=>{
+    const map={};
+    therapists.forEach((t,i)=>{map[t.id]=ROOM_COLORS[i%ROOM_COLORS.length];});
+    return map;
+  },[therapists]);
+
   const {dateStr,hour,minute}=getNow();
   const nowDecimal=hour+minute/60;
   const activeCount=new Set(slots.filter(s=>toDateStr(new Date(s.date))===dateStr&&nowDecimal>=s.startHour&&nowDecimal<s.endHour).map(s=>s.roomId)).size;
@@ -819,7 +827,7 @@ export default function DashboardPage(){
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={notesPerRoom[room.id]||[]} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
-          ):view==='timeline'?<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>:<WeeklyCalendarView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded}/>}
+          ):view==='timeline'?<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded} therapistColorMap={therapistColorMap}/>:<WeeklyCalendarView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded} therapistColorMap={therapistColorMap}/>}
         </>
       )}
       {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)} onAddSlot={(r)=>setAddBookingRoom(r)}/>}

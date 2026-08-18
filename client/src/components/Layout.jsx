@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CalendarDays, User, Settings, Download } from 'lucide-react';
+import axios from 'axios';
+
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const navItems = [
   { to: '/', label: 'לוח חדרים', icon: LayoutDashboard },
@@ -12,12 +15,30 @@ const navItems = [
 export default function Layout() {
   const navigate = useNavigate();
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     const check = () => { if (window.__installPrompt) setInstallPrompt(window.__installPrompt); };
     check();
     window.addEventListener('beforeinstallprompt', check);
     return () => window.removeEventListener('beforeinstallprompt', check);
+  }, []);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      const pass = sessionStorage.getItem('adminPass');
+      if (!pass) { setPendingCount(0); return; }
+      try {
+        const res = await axios.get(`${BASE_URL}/booking-requests`, {
+          params: { status: 'pending' },
+          headers: { 'x-admin-password': pass },
+        });
+        setPendingCount(Array.isArray(res.data) ? res.data.length : 0);
+      } catch { setPendingCount(0); }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleInstall = async () => {
@@ -47,6 +68,11 @@ export default function Layout() {
                 >
                   <Icon size={16} />
                   {label}
+                  {to === '/admin' && pendingCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold leading-none">
+                      {pendingCount > 99 ? '99+' : pendingCount}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -87,8 +113,15 @@ export default function Layout() {
             >
               {({ isActive }) => (
                 <>
-                  <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-green-100' : ''}`}>
-                    <Icon size={20} />
+                  <div className="relative">
+                    <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-green-100' : ''}`}>
+                      <Icon size={20} />
+                    </div>
+                    {to === '/admin' && pendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                        {pendingCount > 99 ? '99+' : pendingCount}
+                      </span>
+                    )}
                   </div>
                   <span className="leading-tight text-center text-xs">{label}</span>
                 </>
