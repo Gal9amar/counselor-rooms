@@ -93,10 +93,15 @@ function RoomModal({room,onClose,onAddSlot,canAdd,memSlots=[],isRangeLoaded}){
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {canAdd&&<button onClick={handleAddSlot}
-              className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
-              <Plus size={14}/> הוספת שיבוץ
-            </button>}
+            {canAdd
+              ?<button onClick={handleAddSlot}
+                className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
+                <Plus size={14}/> הוספת שיבוץ
+              </button>
+              :<a href="/new-booking"
+                className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
+                <Plus size={14}/> בקשת שיבוץ
+              </a>}
             <button onClick={onClose} className="btn-ghost p-1.5"><X size={20}/></button>
           </div>
         </div>
