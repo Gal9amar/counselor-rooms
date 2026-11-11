@@ -11,6 +11,15 @@
   external_node_modules = ["@prisma/client", "prisma"]
   included_files = ["prisma/**", "node_modules/.prisma/**"]
 
+# Basic hardening headers on every response. A full Content-Security-Policy is a follow-up (it could break fonts/scripts).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+
 [[redirects]]
   from = "/api/rooms"
   to = "/.netlify/functions/rooms"
@@ -74,6 +83,26 @@
 [[redirects]]
   from = "/api/booking-requests/*"
   to = "/.netlify/functions/booking-requests/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/bootstrap"
+  to = "/.netlify/functions/bootstrap"
+  status = 200
+
+[[redirects]]
+  from = "/api/bootstrap/*"
+  to = "/.netlify/functions/bootstrap/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/settings"
+  to = "/.netlify/functions/settings"
+  status = 200
+
+[[redirects]]
+  from = "/api/settings/*"
+  to = "/.netlify/functions/settings/:splat"
   status = 200
 
 # Local dev (netlify dev proxies to Vite): let Vite serve its own module paths instead of the SPA fallback below.

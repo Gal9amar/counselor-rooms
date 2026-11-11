@@ -68,7 +68,7 @@ model BookingRequest {
   startHour        Int
   endHour          Int
   note             String?
-  status           String    @default("pending") // "pending" | "approved" | "rejected"
+  status           String    @default("pending") // "pending" | "queued" (over the pending cap, waits for promotion) | "approved" | "rejected"
   bookingType      String    @default("single")  // "single" | "recurring" | "scatter"
   recurFrequency   String?   // "daily" | "weekly" | "monthly"
   recurDays        Int[]     // days of week for weekly (0=Sun..6=Sat)
@@ -94,4 +94,10 @@ model RecurringSchedule {
   occurrences Int?
   createdAt   DateTime       @default(now())
   slots       ScheduleSlot[]
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt
 }

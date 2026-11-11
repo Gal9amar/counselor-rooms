@@ -1,5 +1,5 @@
 const prisma = require('./lib/prisma');
-const { ok, err, cors, checkAdmin } = require('./lib/helpers');
+const { ok, err, cors, checkAdmin, publicCache, handleError, isId } = require('./lib/helpers');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -14,14 +14,14 @@ exports.handler = async (event) => {
     // GET /api/rooms
     if (httpMethod === 'GET') {
       const rooms = await prisma.room.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
-      return ok(rooms);
+      return ok(rooms, 200, publicCache(headers));
     }
 
     // POST /api/rooms (admin)
     if (httpMethod === 'POST' && !isReorder) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { name } = JSON.parse(body || '{}');
-      if (!name) return err('שם חדר נדרש', 400);
+      if (!name) return err('יש להזין שם חדר', 400);
       const maxOrder = await prisma.room.aggregate({ _max: { order: true } });
       const room = await prisma.room.create({ data: { name, order: (maxOrder._max.order ?? -1) + 1 } });
       return ok(room, 201);
@@ -31,8 +31,8 @@ exports.handler = async (event) => {
     if (httpMethod === 'POST' && isReorder) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { ids } = JSON.parse(body || '{}');
-      if (!Array.isArray(ids)) return err('ids נדרש', 400);
-      if (!ids.every(Number.isInteger)) return err('ids חייב להכיל מספרים שלמים', 400);
+      if (!Array.isArray(ids)) return err('יש לבחור חדרים', 400);
+      if (ids.length > 500 || !ids.every(isId)) return err('רשימת החדרים לא תקינה. נסו שוב', 400);
       // One UPDATE for all rooms (was one UPDATE per room inside a transaction).
       await prisma.$executeRaw`
         UPDATE "Room" AS r SET "order" = v.ord::int - 1
@@ -46,7 +46,7 @@ exports.handler = async (event) => {
     if (httpMethod === 'PATCH' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { name } = JSON.parse(body || '{}');
-      if (!name) return err('שם חדר נדרש', 400);
+      if (!name) return err('יש להזין שם חדר', 400);
       const room = await prisma.room.update({ where: { id: parseInt(lastPart) }, data: { name } });
       return ok(room);
     }
@@ -65,7 +65,6 @@ exports.handler = async (event) => {
 
     return err('Method not allowed', 405);
   } catch (e) {
-    if (e.code === 'P2002') return err('חדר עם שם זה כבר קיים', 400);
-    return err(e.message);
+    return handleError(e, 'rooms', 'כבר קיים חדר בשם הזה');
   }
 };

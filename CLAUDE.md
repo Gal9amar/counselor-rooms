@@ -36,10 +36,13 @@ counselor-rooms/
 │       ├── schedule.js             ← GET/POST/PATCH/DELETE slots
 │       ├── recurring.js            ← ניהול תזמון חוזר
 │       ├── admin.js                ← POST verify admin password
+│       ├── settings.js             ← GET/PUT הגדרות (מייל התראות) + POST test-email, Admin בלבד
 │       ├── room-notes.js           ← GET/POST/DELETE הערות לחדרים (RoomNote)
+│       ├── bootstrap.js            ← GET טעינה ראשונית מאוחדת (rooms+therapists+roomNotes+slots)
 │       └── lib/
 │           ├── prisma.js           ← Prisma singleton
-│           └── helpers.js          ← CORS, auth, response helpers
+│           ├── helpers.js          ← CORS, auth, response helpers, publicCache
+│           └── sql.js              ← שאילתות raw SQL מאוחדות (JSON shapes, slotFilters, פרמטרים מאוגדים)
 └── client/                         ← React 18 + Vite
     ├── index.html
     ├── vite.config.js              ← proxy /api → localhost:8888
@@ -92,10 +95,10 @@ netlify dev                  # פורט 8888 – server + client
 
 ### מיגרציות
 ```bash
-npx prisma migrate deploy    # production (uses DIRECT_URL)
 npx prisma migrate dev       # development
 npx prisma db seed           # 5 חדרים + 4 מטפלים
 ```
+**Production:** ב-DB של הפרודקשן אין טבלת `_prisma_migrations`, ולכן `prisma migrate deploy` אינו בשימוש. מיגרציות מוחלות ידנית (Supabase SQL editor / `apply_migration`).
 
 ---
 
@@ -153,7 +156,7 @@ startDate, endDate?, occurrences?
 **BookingRequest**
 ```prisma
 id, therapistName, roomId, date, startHour, endHour, note?
-status: "pending" | "approved" | "rejected"
+status: "pending" | "queued" | "approved" | "rejected"   // String רגיל, בלי שינוי סכמה; 'queued' = בתור (ראו "תור בקשות")
 bookingType: "single" | "recurring" | "scatter"
 recurFrequency?: "daily" | "weekly" | "monthly"
 recurDays: Int[]   // ימי שבוע לשבועי
@@ -170,6 +173,13 @@ startDate: DateTime (midnight UTC)
 endDate: DateTime (midnight UTC)
 startHour: Int?
 endHour: Int?
+```
+
+**AppSetting** (הגדרות מערכת, key/value)
+```prisma
+key: String @id      // כרגע: "bookingNotifyEmail"
+value: String
+updatedAt: DateTime
 ```
 
 ### הערות חשובות
@@ -208,24 +218,41 @@ ADMIN_PASSWORD="your-admin-password"
 | POST | `/therapists` | Admin | יצירת מטפל |
 | PATCH | `/therapists/:id` | Admin | עדכון שם |
 | DELETE | `/therapists/:id` | Admin | מחיקה |
+| GET | `/bootstrap?from=&to=` | Public | קריאה אחת ל-SQL אחד: `{rooms, therapists, roomNotes, slots}` (כל חלק באותה צורה כמו ה-GET שלו; `from`/`to` בלבד, 400 על תאריך לא תקין; בלי קשר ל-`/booking-requests`; ללא מטמון CDN) |
 | GET | `/schedule` | Public | slots (filters: `?roomId=`, `?date=`, `?from=`, `?to=`) |
-| POST | `/schedule` | Public | הזמנת slot |
+| POST | `/schedule` | Admin | יצירת slot ישירה |
 | PATCH | `/schedule/:id` | Admin | עדכון slot |
 | DELETE | `/schedule/:id?scope=` | Admin | מחיקה (single/all/future) |
-| POST | `/recurring` | Public | יצירת תזמון חוזר |
+| GET | `/booking-requests?status=&countOnly=1` | Admin | רשימת בקשות; `countOnly=1` מחזיר `{count}` בלבד (לתג בניווט); `status` = pending/queued/approved/rejected; `no-store` |
+| POST | `/recurring` | Admin | יצירת תזמון חוזר |
 | PATCH | `/recurring/:id` | Admin | עדכון תזמון |
 | POST | `/admin/verify` | — | אימות סיסמת admin |
 | GET | `/room-notes?roomId=` | Public | הערות לחדר |
 | POST | `/room-notes` | Admin | יצירת הערה לחדר |
 | DELETE | `/room-notes/:id` | Admin | מחיקת הערה |
+| GET | `/settings` | Admin | `{notifyEmail, envFallback}` (`no-store`; `notifyEmail` ריק אם לא הוגדר; `envFallback` = קיים `BOOKING_NOTIFY_EMAIL`, הערך לא נחשף) |
+| PUT | `/settings` | Admin | body `{notifyEmail}`; ריק = מחיקת ההגדרה (חוזרים ל-env); אחרת כתובת אחת תקינה (400 אם לא). מחזיר את צורת ה-GET |
+| POST | `/settings/test-email` | Admin | שולח מייל בדיקה לנמען האפקטיבי -> `{sent:true}`; 400 אין נמען, 429 תוך 30 שניות מבדיקה קודמת, 502 כשל Resend |
 
-**Admin Auth:** Header `x-admin-password: [ADMIN_PASSWORD]`
+**Admin Auth:** Header `x-admin-password: [ADMIN_PASSWORD]`. גם `POST /admin/verify` משתמש ב-`checkAdmin` (timing-safe, מחרוזת בלבד, 401 כשאין `ADMIN_PASSWORD` ב-env, 400 'בקשה לא תקינה' על JSON שבור; הצלחה = `{success:true}`).
+
+**התנהגות שגיאות (כל ה-functions):** שגיאה לא צפויה = 500 'אירעה תקלה בשרת. נסו שוב בעוד רגע' (`handleError` ב-`lib/helpers.js`; ללוג נכתב רק `e.code`/`e.name`, אף פעם לא `e.message`); Prisma `P2002` = 400 ידידותי (חדר/מטפל קיימים), `P2025` = 404 'הפריט לא נמצא', `P2003` = 400, JSON שבור = 400 'בקשה לא תקינה'. ולידציה: מזהים שלמים 1..2147483647, שעות שלמות 8..22 (schedule/recurring POST/PATCH; שדות לא תקינים = 400 'שדות לא תקינים'); `GET /room-notes?roomId=` לא תקין = 400. פורמט ה-409 (conflicts / pendingConflict / טקסט החפיפה) לא השתנה.
+
+**Headers:** `netlify.toml` מוסיף ל-`/*`: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'` (בלבד). CSP מלא = משימת המשך (עלול לשבור פונטים/סקריפטים). `publicCache` משתמש ב-`Netlify-Vary: header=x-admin-password,query`; `GET /booking-requests` מחזיר `Cache-Control: no-store`.
+
+### תור בקשות (`booking-requests.js`)
+- סטטוסים: `pending` (גלוי לאדמין, שולח מייל), `queued` (נשמר וממתין), `approved`, `rejected`. תג הבקשות באדמין סופר רק `pending` (`?status=pending&countOnly=1`); `?status=queued` ו-`countOnly=1` עובדים לכל סטטוס.
+- `PENDING_CAP = 10`, `QUEUE_CAP = 200`. ב-`POST` נוצרת השורה, ובאותו `Promise.all` רץ `groupBy status` על pending+queued (רק שורות עם `createdAt` קטן משל הבקשה החדשה, ולכן הספירה לא תלויה בתזמון). אם pending >= 10: השורה מתעדכנת ל-`queued`, בלי מייל. אם גם queued >= 200: השורה נמחקת ו-429 `{error:'יש כרגע עומס רב בבקשות. נסו שוב מאוחר יותר.'}`.
+- תגובת ה-POST (201) היא הבקשה שנוצרה כולל `status` סופי (`pending` או `queued`). תפזורת: כל שורה לפי אותו כלל; המייל המסכם נשלח רק אם השורה האחרונה `pending`.
+- קידום: אחרי PATCH `approved`/`rejected` או DELETE של בקשה `pending`, שאילתה אחת (CTE עם `FOR UPDATE SKIP LOCKED`) מקדמת את ה-`queued` הוותיקים ביותר (`ORDER BY createdAt, id`) כל עוד pending < 10, ונשלח מייל רגיל לכל בקשה שקודמה. כשל בקידום או במייל רק נרשם ללוג (קוד שגיאה) ולא מכשיל את ה-PATCH/DELETE; התגובות לא השתנו.
+
+**כלל עסקי:** יצירת שיבוץ ישירה = מנהל בלבד; משתמשים רגילים שולחים בקשת שיבוץ (`POST /booking-requests`, ציבורי).
 
 ### מייל על בקשת שיבוץ חדשה
-- כל `POST /booking-requests` שולח מייל מעוצב (RTL) דרך Resend (`netlify/functions/lib/email.js`, fetch ישיר ל-API, בלי SDK) אל `BOOKING_NOTIFY_EMAIL` (ברירת מחדל gal9amar@gmail.com).
+- כל `POST /booking-requests` שולח מייל מעוצב (RTL) דרך Resend (`netlify/functions/lib/email.js`, fetch ישיר ל-API, בלי SDK) אל הכתובת שמוגדרת בפאנל הניהול (טבלת `AppSetting`, מפתח `bookingNotifyEmail`, נקרא באותו `Promise.all` של יצירת הבקשה; כשל בקריאה לא מכשיל את הבקשה). `BOOKING_NOTIFY_EMAIL` הוא ה-fallback כשאין הגדרה (לא כתובת בקוד כי הריפו ציבורי). בלי שניהם המייל מדולג ונרשם בלוג.
 - תפזורת = כמה בקשות; הלקוח שולח `scatterAll` (רשימת כל התאריכים) רק עם האחרונה, ולכן יוצא מייל אחד מסכם.
 - כישלון במייל נרשם ללוג ולא מכשיל את הבקשה. ללא `RESEND_API_KEY` המייל מדולג.
-- משתנים (גם ב-Netlify!): `RESEND_API_KEY`, אופציונלי `BOOKING_NOTIFY_EMAIL`, `RESEND_FROM`, `SITE_URL`.
+- משתנים (גם ב-Netlify!): `RESEND_API_KEY` חובה, `BOOKING_NOTIFY_EMAIL` מומלץ כ-fallback; אופציונלי `RESEND_FROM`, `SITE_URL`.
 - **שולח:** הדומיין `hamanulan.com` מאומת ב-Resend (נבדק 2026-11-11), והשולח ברירת המחדל הוא `requests@hamanulan.com`. ב-Netlify חובה להגדיר לפחות `RESEND_API_KEY`. (בלי דומיין מאומת Resend שולח רק לבעל החשבון.)
 
 ---

@@ -6,6 +6,46 @@ const { sendBookingNotification } = require('./lib/email');
 const EMAIL_BURST_LIMIT = 15;
 const EMAIL_BURST_LIMIT_SCATTER = 60;
 const { ok, err, cors, checkAdmin, toMidnightUTC, toDateStr, generateDates } = require('./lib/helpers');
+const { Prisma } = require('./lib/prisma-pkg'); // must be the same package copy as the shared Prisma client
+const { REQUEST_JSON } = require('./lib/sql');
+
+// Request queue: at most PENDING_CAP requests are 'pending' (visible to the admin, e-mailed). Newer ones are saved
+// as 'queued' and promoted (oldest first) when the admin handles a pending one. At QUEUE_CAP queued rows new ones get 429.
+const PENDING_CAP = 10;
+const QUEUE_CAP = 200;
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
+// Promotes the oldest queued requests while pending < PENDING_CAP and e-mails each one. ONE statement (CTE: count pending,
+// pick oldest queued with LIMIT cap-pending, UPDATE ... RETURNING, JOIN room) so the happy path costs one round trip
+// (plus one for the recipient and the emails only when something was promoted). Never throws: PATCH/DELETE must not fail
+// because of it.
+async function promoteQueued() {
+  try {
+    const rows = await prisma.$queryRaw`
+      WITH p AS (SELECT count(*)::int AS c FROM "BookingRequest" WHERE status = 'pending'),
+      pick AS (
+        SELECT id FROM "BookingRequest" WHERE status = 'queued'
+        ORDER BY "createdAt", id
+        LIMIT GREATEST(0, ${PENDING_CAP}::int - (SELECT c FROM p))
+        FOR UPDATE SKIP LOCKED
+      ),
+      upd AS (
+        UPDATE "BookingRequest" u SET status = 'pending' FROM pick WHERE u.id = pick.id RETURNING u.*
+      )
+      SELECT ${REQUEST_JSON} AS j FROM upd b JOIN "Room" r ON r.id = b."roomId" ORDER BY b."createdAt", b.id`;
+    if (!rows || rows.length === 0) return;
+    const promoted = rows.map((r) => r.j);
+    let to = (process.env.BOOKING_NOTIFY_EMAIL || '').trim();
+    try {
+      const setting = await prisma.appSetting.findUnique({ where: { key: 'bookingNotifyEmail' }, select: { value: true } });
+      if (setting && typeof setting.value === 'string' && setting.value.trim()) to = setting.value.trim();
+    } catch (e) { /* env fallback */ }
+    await Promise.all(promoted.map((reqRow) =>
+      Promise.resolve().then(() => sendBookingNotification(reqRow, { to })).catch((e) => console.error('promotion email failed:', e.code || e.name))));
+  } catch (e) {
+    console.error('queue promotion failed:', e.code || e.name);
+  }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -19,14 +59,17 @@ exports.handler = async (event) => {
     // GET /api/booking-requests?status=pending (admin)
     if (httpMethod === 'GET') {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      const where = {};
-      if (qs?.status) where.status = qs.status;
-      const requests = await prisma.bookingRequest.findMany({
-        where,
-        include: { room: { select: { id: true, name: true } } },
-        orderBy: { createdAt: 'desc' },
-      });
-      return ok(requests);
+      const where = qs?.status ? Prisma.sql`WHERE b.status = ${String(qs.status)}` : Prisma.empty;
+      // ?countOnly=1 -> { count } (the nav badge only needs the number, not the rows).
+      if (qs?.countOnly === '1') {
+        const [{ c }] = await prisma.$queryRaw`SELECT count(*)::int AS c FROM "BookingRequest" b ${where}`;
+        return ok({ count: c }, 200, NO_STORE);
+      }
+      // One JOINed statement instead of findMany + a second call for `include: room` (10 -> 5 round trips).
+      const rows = await prisma.$queryRaw`
+        SELECT ${REQUEST_JSON} AS j FROM "BookingRequest" b JOIN "Room" r ON r.id = b."roomId"
+        ${where} ORDER BY b."createdAt" DESC, b.id DESC`;
+      return ok(rows.map((r) => r.j), 200, NO_STORE);
     }
 
     // POST /api/booking-requests (public)
@@ -37,34 +80,40 @@ exports.handler = async (event) => {
         scatterAll,
       } = JSON.parse(body || '{}');
       if (!therapistName || !roomId || !date || startHour == null || endHour == null)
-        return err('חסרים שדות חובה', 400);
+        return err('יש למלא את כל שדות החובה', 400);
       // Numeric/shape validation (the UI limits these, the public API must too).
       const sh = Number(startHour), eh = Number(endHour);
       if (!Number.isInteger(sh) || !Number.isInteger(eh) || sh < 8 || eh > 22 || sh >= eh)
-        return err('שעות לא תקינות: התחלה 8–21, סיום 9–22, וסיום אחרי התחלה', 400);
-      if (!Number.isInteger(Number(roomId))) return err('חדר לא תקין', 400);
+        return err('שעות לא תקינות. שעת ההתחלה בין 8:00 ל-21:00, שעת הסיום בין 9:00 ל-22:00, ושעת הסיום אחרי שעת ההתחלה', 400);
+      if (!Number.isInteger(Number(roomId))) return err('יש לבחור חדר מהרשימה', 400);
       if (typeof therapistName !== 'string' || therapistName.trim().length === 0 || therapistName.length > 80)
-        return err('שם המבקש ארוך מדי (עד 80 תווים)', 400);
+        return err('שם המבקש ארוך מדי. אפשר עד 80 תווים', 400);
       if (note != null && (typeof note !== 'string' || note.length > 300))
-        return err('ההערה ארוכה מדי (עד 300 תווים)', 400);
+        return err('ההערה ארוכה מדי. אפשר עד 300 תווים', 400);
       const type = bookingType || 'single';
-      if (!['single', 'recurring', 'scatter'].includes(type)) return err('סוג שיבוץ לא תקין', 400);
+      if (!['single', 'recurring', 'scatter'].includes(type)) return err('יש לבחור סוג שיבוץ מהרשימה', 400);
       if (type === 'recurring' && !['daily', 'weekly', 'monthly'].includes(recurFrequency))
-        return err('תדירות לא תקינה', 400);
-      if (isNaN(new Date(date))) return err('תאריך לא תקין', 400);
-      if (recurEndDate != null && (typeof recurEndDate !== 'string' || isNaN(new Date(recurEndDate)))) return err('תאריך סיום לא תקין', 400);
+        return err('יש לבחור תדירות מהרשימה', 400);
+      if (isNaN(new Date(date))) return err('יש לבחור תאריך תקין', 400);
+      if (recurEndDate != null && (typeof recurEndDate !== 'string' || isNaN(new Date(recurEndDate)))) return err('יש לבחור תאריך סיום תקין', 400);
       if (recurOccurrences != null && !(Number.isInteger(Number(recurOccurrences)) && Number(recurOccurrences) >= 1 && Number(recurOccurrences) <= 365))
-        return err('מספר מופעים לא תקין', 400);
+        return err('מספר המפגשים לא תקין', 400);
       if (recurDays != null && !(Array.isArray(recurDays) && recurDays.length <= 7 && recurDays.every(d => Number.isInteger(d) && d >= 0 && d <= 6)))
-        return err('ימי שבוע לא תקינים', 400);
+        return err('יש לבחור ימים בשבוע מהרשימה', 400);
 
       const isRecurring = type === 'recurring';
       // Scatter: only the last request (carrying scatterAll) triggers the single summary email.
       const willEmail = type !== 'scatter' || Array.isArray(scatterAll);
       const burstLimit = type === 'scatter' ? EMAIL_BURST_LIMIT_SCATTER : EMAIL_BURST_LIMIT;
       // The burst count does not depend on the new row, so it runs in the same round trip as the create.
-      const [request, recent] = await Promise.all([prisma.bookingRequest.create({
+      // The recipient (admin-panel setting) is read in the same round trip; any failure falls back to the env var.
+      // The queue counts (pending + queued, one groupBy) also run in that same round trip. The new row is excluded by an
+      // explicit createdAt: the count only sees rows strictly older than `createdAt`, so it is the same whether or not the
+      // concurrent create has already committed.
+      const createdAt = new Date();
+      const [request, recent, setting, queueRows] = await Promise.all([prisma.bookingRequest.create({
         data: {
+          createdAt,
           therapistName: therapistName.trim(),
           roomId: parseInt(roomId),
           date: toMidnightUTC(date),
@@ -87,13 +136,36 @@ exports.handler = async (event) => {
               },
             }).catch(() => 0)
           : Promise.resolve(0),
+        willEmail
+          ? (async () => prisma.appSetting.findUnique({ where: { key: 'bookingNotifyEmail' }, select: { value: true } }))().catch(() => null)
+          : Promise.resolve(null),
+        // A failed count must not fail a request that is being saved: it then simply stays 'pending'.
+        (async () => prisma.bookingRequest.groupBy({
+          by: ['status'],
+          where: { status: { in: ['pending', 'queued'] }, createdAt: { lt: createdAt } },
+          _count: { _all: true },
+        }))().catch(() => []),
       ]);
+
+      // Queue: over PENDING_CAP pending requests the new one waits as 'queued' (no email, not shown as pending).
+      // At QUEUE_CAP queued requests the new one is refused (the row is deleted again).
+      const countOf = (s) => ((queueRows || []).find((g) => g.status === s)?._count?._all) || 0;
+      if (countOf('pending') >= PENDING_CAP) {
+        if (countOf('queued') >= QUEUE_CAP) {
+          await prisma.bookingRequest.delete({ where: { id: request.id } }).catch((e) => console.error('queue overflow cleanup failed:', e.code || e.name));
+          return err('יש כרגע עומס רב בבקשות. נסו שוב מאוחר יותר.', 429);
+        }
+        // Fail-open: if this update fails the request simply stays pending (never answer 500 for a saved request).
+        await prisma.bookingRequest.update({ where: { id: request.id }, data: { status: 'queued' }, select: { id: true } })
+          .then(() => { request.status = 'queued'; })
+          .catch((e) => console.error('queue update failed:', e.code || e.name));
+      }
 
       // Email the owner about every new request. A scatter submission arrives as several requests;
       // the client sends the full list (scatterAll) only with the last one, so that is one email in total.
-      // Failures are logged and never fail the request.
+      // Failures are logged and never fail the request. Queued requests send no email until they are promoted.
       const isScatter = request.bookingType === 'scatter';
-      if (willEmail) {
+      if (willEmail && request.status !== 'queued') {
         try {
           // Abuse guard: this endpoint is public, so cap the emails sent per 10 minutes (the request itself is always saved
           // and visible in the admin panel). `recent` excludes the row just created, hence `<` instead of `<=`.
@@ -105,7 +177,8 @@ exports.handler = async (event) => {
                   .map(e => ({ date: toMidnightUTC(e.date), startHour: parseInt(e.startHour), endHour: parseInt(e.endHour) }))
                   .filter(e => Number.isInteger(e.startHour) && Number.isInteger(e.endHour) && e.startHour >= 8 && e.endHour <= 22 && e.startHour < e.endHour)
               : undefined;
-            await sendBookingNotification(request, { scatter: scatter && scatter.length ? scatter : undefined });
+            const to = (setting && typeof setting.value === 'string' && setting.value.trim()) || (process.env.BOOKING_NOTIFY_EMAIL || '').trim();
+            await sendBookingNotification(request, { scatter: scatter && scatter.length ? scatter : undefined, to });
           } else {
             console.warn(`booking email skipped: ${recent} requests in the last 10 minutes`);
           }
@@ -124,7 +197,7 @@ exports.handler = async (event) => {
 
       if (status === 'approved') {
         const reqRecord = await prisma.bookingRequest.findUnique({ where: { id } });
-        if (!reqRecord) return err('בקשה לא נמצאה', 404);
+        if (!reqRecord) return err('הבקשה לא נמצאה. ייתכן שכבר טופלה', 404);
 
         const finalRoomId = roomId != null ? parseInt(roomId) : reqRecord.roomId;
         const finalDate = date ? toMidnightUTC(date) : reqRecord.date;
@@ -152,7 +225,7 @@ exports.handler = async (event) => {
             endDate: endDateStr,
             occurrences: reqRecord.recurOccurrences || null,
           });
-          if (dates.length === 0) return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
+          if (dates.length === 0) return err('לא נמצאו תאריכים בטווח שנבחר. בדקו את הגדרות הסדרה', 400);
 
           // בדיקת חפיפות לכל התאריכים
           const overlapping = await prisma.scheduleSlot.findMany({
@@ -205,6 +278,7 @@ exports.handler = async (event) => {
             orderBy: { date: 'asc' },
           });
           await prisma.bookingRequest.update({ where: { id }, data: { status: 'approved' } });
+          await promoteQueued();
           return ok({ request: { id, status: 'approved' }, slots: createdSlots, recurring });
         }
 
@@ -235,11 +309,13 @@ exports.handler = async (event) => {
           include: { room: true, therapist: true },
         });
         await prisma.bookingRequest.update({ where: { id }, data: { status: 'approved' } });
+        await promoteQueued();
         return ok({ request: { id, status: 'approved' }, slot });
       }
 
       if (status === 'rejected') {
         const updated = await prisma.bookingRequest.update({ where: { id }, data: { status: 'rejected' } });
+        await promoteQueued();
         return ok(updated);
       }
 
@@ -263,15 +339,17 @@ exports.handler = async (event) => {
     // DELETE /api/booking-requests/:id (admin)
     if (httpMethod === 'DELETE' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
-      await prisma.bookingRequest.delete({ where: { id: parseInt(lastPart) } });
+      const deleted = await prisma.bookingRequest.delete({ where: { id: parseInt(lastPart) } });
+      if (deleted && deleted.status === 'pending') await promoteQueued();
       return ok({ success: true });
     }
 
     return err('Method not allowed', 405);
   } catch (e) {
-    console.error('booking-requests error:', e.message);
-    if (e instanceof SyntaxError) return err('בקשה לא תקינה', 400);
-    if (e.code === 'P2003') return err('החדר שנבחר לא קיים', 400);
-    return err('שגיאת שרת, נסו שוב', 500);
+    console.error('booking-requests error:', e.code || e.name);
+    if (e instanceof SyntaxError) return err('הבקשה לא תקינה. נסו שוב', 400);
+    if (e.code === 'P2025') return err('הבקשה לא נמצאה. ייתכן שכבר טופלה', 404);
+    if (e.code === 'P2003') return err('החדר שנבחר אינו קיים. בחרו חדר אחר', 400);
+    return err('אירעה תקלה בשרת. נסו שוב בעוד רגע', 500);
   }
 };

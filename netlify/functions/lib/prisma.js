@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require('./prisma-pkg'); // same package copy as the shared client, see prisma-pkg.js
 
 // Reuse client across warm invocations (serverless best practice)
 let prisma;

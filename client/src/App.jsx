@@ -6,6 +6,8 @@ import SchedulePage from './pages/SchedulePage';
 import MySchedulePage from './pages/MySchedulePage';
 import AdminPage from './pages/AdminPage';
 import NewBookingPage from './pages/NewBookingPage';
+import NotFoundPage from './pages/NotFoundPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export const LoadingContext = createContext({ loading: false, setLoading: () => {} });
 export function useLoading() { return useContext(LoadingContext); }
@@ -75,15 +77,18 @@ export default function App() {
     <LoadingContext.Provider value={{ loading, setLoading }}>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <LoadingOverlay />
+        <ErrorBoundary>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/my-schedule" element={<MySchedulePage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="/new-booking" element={<NewBookingPage />} />
         </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </LoadingContext.Provider>
   );

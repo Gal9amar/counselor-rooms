@@ -1,5 +1,5 @@
 const prisma = require('./lib/prisma');
-const { ok, err, cors, checkAdmin } = require('./lib/helpers');
+const { ok, err, cors, checkAdmin, publicCache, handleError } = require('./lib/helpers');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -12,14 +12,14 @@ exports.handler = async (event) => {
     // GET /api/therapists
     if (httpMethod === 'GET') {
       const therapists = await prisma.therapist.findMany({ orderBy: { name: 'asc' } });
-      return ok(therapists);
+      return ok(therapists, 200, publicCache(headers));
     }
 
     // POST /api/therapists (admin)
     if (httpMethod === 'POST') {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { name } = JSON.parse(body || '{}');
-      if (!name) return err('שם מטפל נדרש', 400);
+      if (!name) return err('יש להזין שם מטפל', 400);
       const therapist = await prisma.therapist.create({ data: { name } });
       return ok(therapist, 201);
     }
@@ -28,7 +28,7 @@ exports.handler = async (event) => {
     if (httpMethod === 'PATCH' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const { name } = JSON.parse(body || '{}');
-      if (!name) return err('שם מטפל נדרש', 400);
+      if (!name) return err('יש להזין שם מטפל', 400);
       const therapist = await prisma.therapist.update({ where: { id: parseInt(id) }, data: { name } });
       return ok(therapist);
     }
@@ -47,7 +47,6 @@ exports.handler = async (event) => {
 
     return err('Method not allowed', 405);
   } catch (e) {
-    if (e.code === 'P2002') return err('מטפל עם שם זה כבר קיים', 400);
-    return err(e.message);
+    return handleError(e, 'therapists', 'כבר קיים מטפל בשם הזה');
   }
 };

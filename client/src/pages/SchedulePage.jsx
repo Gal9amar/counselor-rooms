@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getRooms, getTherapists, getSchedule, bookSlot, bookRecurring, clearSlot, getRoomNotes } from '../services/api';
+import useAdmin from '../hooks/useAdmin';
+import RouteError from '../components/RouteError';
+import { handleAdminDenied, ADMIN_ONLY_MESSAGE } from '../services/adminAuth';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, X, Repeat2, AlertTriangle, Trash2 } from 'lucide-react';
 
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -15,7 +18,7 @@ const FREQ_OPTIONS = [
 
 function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function hLabel(h) { return `${h}:00`; }
-function formatDateHe(ds) { const d = new Date(ds + 'T00:00:00'); return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`; }
+function formatDateHe(ds) { const d = new Date(ds + 'T00:00:00'); return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`; }
 
 function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blockedDates, partialBlockedDates }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -110,15 +113,15 @@ function DeleteModal({ slot, onClose, onDelete }) {
           <h3 className="font-bold text-gray-800">מחיקת שיבוץ</h3>
         </div>
         <p className="text-sm text-gray-600 mb-4">
-          {isRecurring ? 'שיבוץ זה הוא חלק מסדרה חוזרת. מה ברצונך למחוק?' : 'האם למחוק שיבוץ זה?'}
+          {isRecurring ? 'שיבוץ זה הוא חלק מסדרה חוזרת. מה למחוק?' : 'האם למחוק שיבוץ זה?'}
         </p>
         <div className="space-y-2">
           <button onClick={() => onDelete('single')} className="w-full text-right px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition-colors">
-            מחק רק תאריך זה
+            מחיקת תאריך זה בלבד
           </button>
           {isRecurring && (
             <button onClick={() => onDelete('all')} className="w-full text-right px-4 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-medium text-red-600 transition-colors">
-              מחק את כל הסדרה
+              מחיקת כל הסדרה
             </button>
           )}
           <button onClick={onClose} className="w-full text-right px-4 py-3 text-sm text-gray-400 hover:text-gray-600 transition-colors">
@@ -138,6 +141,7 @@ export default function SchedulePage() {
   const [allSlots, setAllSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
+  const { isAdmin, denied, clearDenied } = useAdmin();
   const [step, setStep] = useState('room');
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -164,7 +168,11 @@ export default function SchedulePage() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [blockingNotes, setBlockingNotes] = useState([]); // notes for selected room
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState(null);
+  const [statsError, setStatsError] = useState(false);
+
+  const loadInitial = () => {
+    setLoadError(null); setLoading(true);
     const _today = new Date();
     const _y = _today.getFullYear();
     const _m = _today.getMonth();
@@ -182,8 +190,9 @@ export default function SchedulePage() {
         const preRoom = sorted.find(room => room.id === preId);
         if (preRoom) setTimeout(() => handleSelectRoom(preRoom), 0);
       }
-    });
-  }, []);
+    }).catch(e => { setLoadError(e); setLoading(false); });
+  };
+  useEffect(() => { loadInitial(); }, []);
 
   const handleSelectRoom = async (room) => {
     setSelectedRoom(room); setStep('date'); setSelectedDate(null);
@@ -211,15 +220,20 @@ export default function SchedulePage() {
     const s = await getSchedule({ roomId: selectedRoom.id, from: `${py}-01-01`, to: `${py}-12-31` });
     setAllSlots(p => [...p, ...s]);
   };
+  const statsRange = () => {
+    const _n = new Date();
+    const _e = new Date(_n.getFullYear(), _n.getMonth() + 4, 0);
+    return {
+      from: `${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-01`,
+      to: `${_e.getFullYear()}-${String(_e.getMonth()+1).padStart(2,'0')}-${String(_e.getDate()).padStart(2,'0')}`,
+    };
+  };
   const back = () => {
     if (step === 'hour') { setStep('date'); setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false); }
     else if (step === 'date') { setStep('room'); setSelectedRoom(null);
       // Reload stats for all rooms
-      const _n=new Date();
-      const _f=`${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}-01`;
-      const _e=new Date(_n.getFullYear(),_n.getMonth()+4,0);
-      const _t=`${_e.getFullYear()}-${String(_e.getMonth()+1).padStart(2,'0')}-${String(_e.getDate()).padStart(2,'0')}`;
-      getSchedule({from:_f,to:_t}).then(s=>setAllSlots(s)); }
+      setStatsError(false);
+      getSchedule(statsRange()).then(s=>setAllSlots(s)).catch(()=>setStatsError(true)); }
   };
 
   const toggleRecurDay = (day) => {
@@ -267,15 +281,15 @@ export default function SchedulePage() {
     if (!end || end <= startHour) { setBookError('שעת הסיום אינה תקינה'); return; }
     if (!selectedTherapist) { setBookError('נא לבחור שם'); return; }
     const _tName = therapists.find(t => t.id === parseInt(selectedTherapist))?.name || '';
-    if (_tName === 'אגף הרווחה' && !note.trim()) { setBookError('עבור אגף הרווחה יש למלא הערה'); return; }
-    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלו'); return; }
+    if (_tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף הרווחה יש למלא הערה'); return; }
+    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלה'); return; }
 
     setBooking(true); setBookError('');
 
     if (isRecurring) {
       // Recurring booking
       if (recurFrequency === 'weekly' && recurDays.length === 0) { setBookError('יש לבחור לפחות יום אחד'); setBooking(false); return; }
-      if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setBookError('יש להזין מספר מופעים'); setBooking(false); return; }
+      if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setBookError('יש להזין מספר מפגשים'); setBooking(false); return; }
       if (recurEndMode === 'date' && !recurEndDate) { setBookError('יש לבחור תאריך סיום'); setBooking(false); return; }
 
       try {
@@ -296,13 +310,14 @@ export default function SchedulePage() {
         setAllSlots(p => [...p, ...result.slots]);
         setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote(''); setIsRecurring(false); setRecurDays([]);
       } catch (e) {
+        if (handleAdminDenied(e)) { setBookError(ADMIN_ONLY_MESSAGE); setBooking(false); return; }
         const data = e.response?.data?.error;
         try {
           const parsed = JSON.parse(data);
           if (parsed.pendingConflict) setPendingConflictInfo({ type: 'recurring', conflicts: parsed.conflicts });
           else if (parsed.conflicts) setConflictModal(parsed.conflicts);
-          else setBookError(data || 'שגיאה');
-        } catch { setBookError(data || 'שגיאה'); }
+          else setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+        } catch { setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.'); }
       }
     } else {
       // One-time booking
@@ -311,12 +326,13 @@ export default function SchedulePage() {
         setDaySlots(p => [...p, slot]); setAllSlots(p => [...p, slot]);
         setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote('');
       } catch (e) {
+        if (handleAdminDenied(e)) { setBookError(ADMIN_ONLY_MESSAGE); setBooking(false); return; }
         const data = e.response?.data?.error;
         try {
           const parsed = JSON.parse(data);
           if (parsed.pendingConflict) setPendingConflictInfo({ type: 'single', conflicts: parsed.conflicts });
-          else setBookError(data || 'שגיאה');
-        } catch { setBookError(data || 'שגיאה'); }
+          else setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+        } catch { setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.'); }
       }
     }
     setBooking(false);
@@ -347,7 +363,10 @@ export default function SchedulePage() {
         setDaySlots(p => [...p, slot]); setAllSlots(p => [...p, slot]);
         setStartHour(null); setEndHour(''); setSelectedTherapist(''); setNote('');
       }
-    } catch (e) { setBookError(e.response?.data?.error || 'שגיאה'); }
+    } catch (e) {
+      if (handleAdminDenied(e)) setBookError(ADMIN_ONLY_MESSAGE);
+      else setBookError(e.response?.data?.error || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+    }
     setBooking(false);
   };
 
@@ -368,14 +387,21 @@ export default function SchedulePage() {
         setAllSlots(p => p.filter(s => s.id !== slot.id));
       }
     } catch (e) {
-      console.error('Delete failed', e);
+      console.error('Delete failed', e?.message);
     }
   };
 
   if (loading) return <div className="text-center text-gray-400 py-20">טוען...</div>;
+  if (loadError && rooms.length === 0) return <RouteError error={loadError} onRetry={loadInitial} compact={false} />;
 
   return (
     <div className="max-w-5xl mx-auto">
+      {denied && (
+        <div role="alert" className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-4 text-sm">
+          <span>{ADMIN_ONLY_MESSAGE}</span>
+          <button onClick={clearDenied} aria-label="סגירת הודעה" className="btn-ghost p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={16} /></button>
+        </div>
+      )}
       {conflictModal && <ConflictModal conflicts={conflictModal} onClose={() => setConflictModal(null)} />}
       {deleteModal && <DeleteModal slot={deleteModal} onClose={() => setDeleteModal(null)} onDelete={confirmDelete} />}
       {pendingConflictInfo && (
@@ -395,7 +421,7 @@ export default function SchedulePage() {
             <p className="text-sm text-gray-600 mb-4">האם לבצע את השיבוץ בכל זאת?</p>
             <div className="flex gap-2">
               <button onClick={() => setPendingConflictInfo(null)} className="flex-1 btn-ghost py-2 text-sm">ביטול</button>
-              <button onClick={handleForceBook} className="flex-1 btn-primary py-2 text-sm">שבץ בכל זאת</button>
+              <button onClick={handleForceBook} className="flex-1 btn-primary py-2 text-sm">שיבוץ בכל זאת</button>
             </div>
           </div>
         </div>
@@ -403,23 +429,29 @@ export default function SchedulePage() {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-5 fade-up">
-        <span className={step === 'room' ? 'font-semibold text-green-600' : 'hover:text-gray-600 cursor-pointer'} onClick={() => step !== 'room' && back() && back()}>בחר חדר</span>
+        <span className={step === 'room' ? 'font-semibold text-green-600' : 'hover:text-gray-600 cursor-pointer'} onClick={() => step !== 'room' && back() && back()}>בחירת חדר</span>
         <ChevronLeft size={13} />
-        <span className={step === 'date' ? 'font-semibold text-green-600' : step === 'hour' ? 'text-gray-600' : 'text-gray-300'}>{selectedRoom?.name || 'בחר תאריך'}</span>
+        <span className={step === 'date' ? 'font-semibold text-green-600' : step === 'hour' ? 'text-gray-600' : 'text-gray-300'}>{selectedRoom?.name || 'בחירת תאריך'}</span>
         <ChevronLeft size={13} />
-        <span className={step === 'hour' ? 'font-semibold text-green-600' : 'text-gray-300'}>{selectedDate ? formatDateHe(selectedDate) : 'בחר שעה'}</span>
+        <span className={step === 'hour' ? 'font-semibold text-green-600' : 'text-gray-300'}>{selectedDate ? formatDateHe(selectedDate) : 'בחירת שעה'}</span>
       </div>
 
       {step !== 'room' && (
         <button onClick={back} className="mb-5 btn-ghost flex items-center gap-1 text-sm text-green-600 px-2 py-1.5">
-          <ChevronRight size={14} /> חזור
+          <ChevronRight size={14} /> חזרה
         </button>
       )}
 
       {step === 'room' && (
         <div className="fade-up">
           <h1 className="section-title mb-1">לוח שיבוצים</h1>
-          <p className="text-gray-400 text-sm mb-6">בחר חדר לשיבוץ</p>
+          <p className="text-gray-400 text-sm mb-6">{isAdmin ? 'בחרו חדר לשיבוץ' : 'בחרו חדר לצפייה בשיבוצים'}</p>
+          {statsError && (
+            <div role="alert" className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-4 text-sm">
+              <span>לא הצלחנו לרענן את נתוני השיבוצים. הנתונים המוצגים עשויים להיות לא עדכניים.</span>
+              <button onClick={() => { setStatsError(false); getSchedule(statsRange()).then(s => setAllSlots(s)).catch(() => setStatsError(true)); }} className="btn-ghost px-3 min-h-[44px] text-sm shrink-0">נסו שוב</button>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {rooms.map((room, i) => (
               <button key={room.id} onClick={() => handleSelectRoom(room)}
@@ -427,7 +459,7 @@ export default function SchedulePage() {
                 {/* Header */}
                 <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
                   <span className="font-bold text-gray-800 text-lg">{room.name}</span>
-                  <span className="text-green-500 text-sm font-medium">לשיבוץ ←</span>
+                  <span className="text-green-500 text-sm font-medium">{isAdmin ? 'לשיבוץ ←' : 'לצפייה ←'}</span>
                 </div>
                 {/* Stats */}
                 {(()=>{
@@ -474,14 +506,14 @@ export default function SchedulePage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
               <h1 className="section-title">{selectedRoom.name}</h1>
-              <p className="text-gray-400 text-sm">בחר תאריך לשיבוץ</p>
+              <p className="text-gray-400 text-sm">{isAdmin ? 'בחרו תאריך לשיבוץ' : 'בחרו תאריך לצפייה'}</p>
             <div className="flex items-center gap-2 mt-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-green-400 shrink-0 inline-block"/>
               <span className="text-sm font-semibold text-gray-700">נקודה ירוקה — יש שיבוצים באותו יום</span>
             </div>
           </div>
             <button onClick={handleAddYear} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-2 whitespace-nowrap">
-              <Plus size={15} /> הוסף שנה ({Math.max(...years) + 1})
+              <Plus size={15} /> הוספת שנה ({Math.max(...years) + 1})
             </button>
           </div>
           <div className="flex gap-2 mb-5 flex-wrap">
@@ -516,9 +548,9 @@ export default function SchedulePage() {
         <div className="fade-up">
           <h1 className="section-title mb-1">{selectedRoom.name}</h1>
           <p className="text-green-600 font-medium text-sm mb-5">{formatDateHe(selectedDate)}</p>
-          {new Date(selectedDate+'T00:00:00') < today ? (
+          {(new Date(selectedDate+'T00:00:00') < today || !isAdmin) ? (
             <div className="card rounded-2xl p-5 fade-up">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3">היסטוריית שיבוצים</p>
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3">{new Date(selectedDate+'T00:00:00') < today ? 'היסטוריית שיבוצים' : 'שיבוצים ביום זה'}</p>
               {daySlots.length === 0
                 ? <p className="text-gray-400 text-sm text-center py-4">אין שיבוצים ביום זה</p>
                 : <div className="space-y-2">
@@ -536,7 +568,7 @@ export default function SchedulePage() {
               }
             </div>
           ) : (<>
-          <p className="text-gray-500 text-sm mb-3">בחר שעת התחלה</p>
+          <p className="text-gray-500 text-sm mb-3">בחרו שעת התחלה</p>
           {blockedHoursForDate.size > 0 && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-4 text-sm text-red-700">
               <span>🚫</span>
@@ -576,7 +608,7 @@ export default function SchedulePage() {
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת סיום</label>
                   <select className="input" value={endHour} onChange={e => setEndHour(e.target.value)}>
-                    <option value="">בחר שעה...</option>
+                    <option value="">בחרו שעה...</option>
                     {ALL_HOURS.filter(h => h > startHour).map(h => {
                       const blocked = Array.from({ length: h - startHour }, (_, i) => startHour + i).some(x => occupiedHours.has(x));
                       return <option key={h} value={h} disabled={blocked}>{hLabel(h)}{blocked ? ' (תפוס)' : ''}</option>;
@@ -587,7 +619,7 @@ export default function SchedulePage() {
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך</label>
                   <select className="input" value={selectedTherapist} onChange={e => setSelectedTherapist(e.target.value)}>
-                    <option value="">בחר שם...</option>
+                    <option value="">בחרו שם...</option>
                     {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
@@ -607,7 +639,7 @@ export default function SchedulePage() {
                       <textarea
                         className={`input resize-none${_isAgaf && !note.trim() ? ' border-red-300' : ''}`}
                         rows={2}
-                        placeholder={_isAgaf ? 'נא פרט את מטרת השימוש בחדר...' : 'לדוגמה: טיפול זוגי, יש להכין מצע...'}
+                        placeholder={_isAgaf ? 'נא לפרט את מטרת השימוש בחדר...' : 'לדוגמה: טיפול זוגי, יש להכין מצע...'}
                         value={note}
                         onChange={e => setNote(e.target.value)}
                         maxLength={200}
@@ -680,7 +712,7 @@ export default function SchedulePage() {
                             <input type="radio" name="endMode" value={mode} checked={recurEndMode === mode}
                               onChange={() => setRecurEndMode(mode)}
                               className="accent-green-500" />
-                            {mode === 'occurrences' ? 'לפי מספר מופעים' : 'לפי תאריך סיום'}
+                            {mode === 'occurrences' ? 'לפי מספר מפגשים' : 'לפי תאריך סיום'}
                           </label>
                         ))}
                       </div>
@@ -689,7 +721,7 @@ export default function SchedulePage() {
                           <input type="number" dir="ltr" min={1} max={200} value={recurOccurrences}
                             onChange={e => setRecurOccurrences(e.target.value)}
                             className="input text-center" style={{width:'5rem'}} />
-                          <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
+                          <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מפגשים'}</span>
                         </div>
                       ) : (
                         <input type="date" dir="ltr" value={recurEndDate} min={selectedDate}
@@ -706,8 +738,8 @@ export default function SchedulePage() {
                 <button onClick={handleBook} disabled={!endHour || !selectedTherapist || booking}
                   className="btn-primary flex-1 py-2.5 px-4">
                   {booking ? 'שומר...' : isRecurring
-                    ? `שמור סדרה חוזרת ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`
-                    : `אשר שיבוץ ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`}
+                    ? `שמירת סדרה חוזרת ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`
+                    : `אישור שיבוץ ${hLabel(startHour)}–${endHour ? hLabel(parseInt(endHour)) : ''}`}
                 </button>
                 <button type="button" onClick={() => { setStartHour(null); setEndHour(''); setBookError(''); setIsRecurring(false); }} className="btn-secondary px-4 py-2.5">ביטול</button>
               </div>
@@ -729,7 +761,7 @@ export default function SchedulePage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-sm text-green-600 font-medium">{hLabel(s.startHour)} – {hLabel(s.endHour)}</span>
+                      <span className="text-sm text-green-600 font-medium">{hLabel(s.startHour)}–{hLabel(s.endHour)}</span>
                     </div>
                     {s.note && <p className="text-xs text-gray-400 italic mt-1.5 pr-1">{s.note}</p>}
                   </div>

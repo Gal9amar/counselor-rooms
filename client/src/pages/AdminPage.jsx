@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import useAdmin from '../hooks/useAdmin';
+import RouteError from '../components/RouteError';
+import NotifyEmailCard from '../components/NotifyEmailCard';
+import { loginAdmin, logoutAdmin } from '../services/adminAuth';
 import {
-  verifyAdmin, setAdminPassword,
   getRooms, addRoom, updateRoom, deleteRoom, reorderRooms,
   getTherapists, addTherapist, updateTherapist, deleteTherapist,
   getSchedule, updateSlot, clearSlot, updateRecurring, deleteRecurring,
@@ -16,7 +19,7 @@ const ALL_HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
 const FREQ_HE={daily:'יומי',weekly:'שבועי',monthly:'חודשי',yearly:'שנתי'};
 
 function toDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function formatDateHe(ds){const d=new Date(ds+'T00:00:00');return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;}
+function formatDateHe(ds){const d=new Date(ds+'T00:00:00');return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;}
 function hLabel(h){return `${h}:00`;}
 
 function EditableRow({item,onRename,onDelete,placeholder,dragHandleProps}){
@@ -114,7 +117,7 @@ function MonthsDropdown({filterMonths,onChange}){
           </div>
           <div className="flex gap-1 mt-2 pt-2 border-t border-gray-100">
             <button type="button" onClick={()=>onChange(MONTHS_HE.map((_,i)=>i))}
-              className="flex-1 text-xs text-green-600 hover:bg-green-50 py-1 rounded-lg transition-colors">הכל</button>
+              className="flex-1 text-xs text-green-600 hover:bg-green-50 py-1 rounded-lg transition-colors">הכול</button>
             <button type="button" onClick={()=>onChange([new Date().getMonth()])}
               className="flex-1 text-xs text-gray-500 hover:bg-gray-50 py-1 rounded-lg transition-colors">החודש</button>
           </div>
@@ -125,7 +128,7 @@ function MonthsDropdown({filterMonths,onChange}){
 }
 
 export default function AdminPage(){
-  const [authed,setAuthed]=useState(!!sessionStorage.getItem('adminPass'));
+  const {isAdmin:authed,checking:authChecking}=useAdmin();
   const [password,setPassword]=useState('');
   const [authError,setAuthError]=useState('');
   const [tab,setTab]=useState(()=>{ // /admin?tab=requests (used by the notification email) opens that tab
@@ -158,12 +161,31 @@ export default function AdminPage(){
 
   const loadRequests=async()=>{
     setRequestsLoading(true);
-    try{const r=await getBookingRequests('pending');setBookingRequests(r);}
-    catch{setBookingRequests([]);}
+    setRequestsError(null);
+    try{
+      const [r,q]=await Promise.all([
+        getBookingRequests('pending'),
+        getBookingRequests('queued').catch(()=>[]), // the queue list is secondary: never block the pending list
+      ]);
+      setBookingRequests(r);setQueuedRequests(Array.isArray(q)?q:[]);
+    }
+    catch(e){setRequestsError(e);}
     finally{setRequestsLoading(false);}
   };
+  // after approve/reject/delete the server may promote queued requests: refresh both lists without the loading state
+  const refreshRequestsQuiet=async()=>{
+    try{
+      const [r,q]=await Promise.all([getBookingRequests('pending'),getBookingRequests('queued').catch(()=>[])]);
+      setBookingRequests(r);setQueuedRequests(Array.isArray(q)?q:[]);
+    }catch{/* keep the current lists */}
+  };
+  const [queuedRequests,setQueuedRequests]=useState([]);
+  const [showQueued,setShowQueued]=useState(false);
+  const BOOKING_TYPE_HE={single:'חד-פעמי',recurring:'קבוע',scatter:'תפזורת'};
+  const [requestsError,setRequestsError]=useState(null);
+  const [loadError,setLoadError]=useState(null);
 
-  useEffect(()=>{if(authed){setAdminPassword(sessionStorage.getItem('adminPass'));loadAll(filterYear,filterMonths);getRoomNotes().then(setRoomNotes).catch(()=>{});loadRequests();}},[authed]);
+  useEffect(()=>{if(authed){loadAll(filterYear,filterMonths);getRoomNotes().then(setRoomNotes).catch(()=>{});loadRequests();}},[authed]);
 
   const loadAll=async(year,months)=>{
     const y=year??filterYear;
@@ -174,14 +196,16 @@ export default function AdminPage(){
     const from=`${y}-${String(firstM+1).padStart(2,'0')}-01`;
     const lastDay=new Date(y,lastM+1,0).getDate();
     const to=`${y}-${String(lastM+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
-    const [r,t,s]=await Promise.all([getRooms(),getTherapists(),getSchedule({from,to})]);
-    // Filter slots to only selected months
-    const filtered=s.filter(sl=>ms.includes(new Date(sl.date).getMonth()));
-    setRooms(r);setTherapists(t);setSlots(filtered);
+    try{
+      const [r,t,s]=await Promise.all([getRooms(),getTherapists(),getSchedule({from,to})]);
+      // Filter slots to only selected months
+      const filtered=s.filter(sl=>ms.includes(new Date(sl.date).getMonth()));
+      setRooms(r);setTherapists(t);setSlots(filtered);setLoadError(null);
+    }catch(e){setLoadError(e);}
   };
 
-  const handleLogin=async()=>{try{await verifyAdmin(password);sessionStorage.setItem('adminPass',password);setAdminPassword(password);setAuthed(true);}catch{setAuthError('סיסמה שגויה');}};
-  const addR=async()=>{if(!newRoom.trim())return;try{await addRoom(newRoom.trim());setNewRoom('');setError('');setRooms(await getRooms());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
+  const handleLogin=async()=>{try{await loginAdmin(password);setAuthError('');}catch{setAuthError('הסיסמה שגויה. נסו שוב.');}};
+  const addR=async()=>{if(!newRoom.trim())return;try{await addRoom(newRoom.trim());setNewRoom('');setError('');setRooms(await getRooms());}catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}};
 
   const saveNote=async()=>{
     const {message,startDate,endDate,startHour,endHour,blocksBooking}=noteForm;
@@ -194,17 +218,17 @@ export default function AdminPage(){
       const n=await addRoomNote({roomId:noteModal,message:message.trim(),startDate,endDate,startHour:sh,endHour:eh,blocksBooking});
       setRoomNotes(p=>[...p,n]);
       setNoteModal(null);
-    }catch(e){setNoteError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setNoteError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
     finally{setNoteSaving(false);}
   };
   const removeNote=async(id)=>{
     try{await deleteRoomNote(id);setRoomNotes(p=>p.filter(n=>n.id!==id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
 
   const saveHoliday=async()=>{
     const {message,startDate,endDate}=holidayForm;
-    if(!message.trim()||!startDate||!endDate){setHolidayError('יש למלא שם החג/חופשה ותאריכים');return;}
+    if(!message.trim()||!startDate||!endDate){setHolidayError('יש למלא שם החג או החופשה ותאריכים');return;}
     if(endDate<startDate){setHolidayError('תאריך הסיום חייב להיות לאחר תאריך ההתחלה');return;}
     if(rooms.length===0){setHolidayError('אין חדרים להחיל עליהם את החסימה');return;}
     setHolidaySaving(true);setHolidayError('');
@@ -215,7 +239,7 @@ export default function AdminPage(){
       setRoomNotes(p=>[...p,...newNotes]);
       setHolidayModal(false);
       setHolidayForm({message:'',startDate:'',endDate:''});
-    }catch(e){setHolidayError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setHolidayError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
     finally{setHolidaySaving(false);}
   };
 
@@ -229,32 +253,32 @@ export default function AdminPage(){
       await Promise.all(toDelete.map(n=>deleteRoomNote(n.id)));
       const deletedIds=new Set(toDelete.map(n=>n.id));
       setRoomNotes(p=>p.filter(n=>!deletedIds.has(n.id)));
-    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
 
-  const renR=async(id,n)=>{try{await updateRoom(id,n);setRooms(p=>p.map(r=>r.id===id?{...r,name:n}:r));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
+  const renR=async(id,n)=>{try{await updateRoom(id,n);setRooms(p=>p.map(r=>r.id===id?{...r,name:n}:r));}catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');throw e;}};
   const delR=async(id)=>{
     const r=rooms.find(r=>r.id===id);
     const cnt=slots.filter(s=>s.roomId===id).length;
     const msg=cnt>0
-      ?`לחדר "${r?.name}" יש ${cnt} שיבוצים.\nמחיקתו תמחק גם את כל השיבוצים שלו.\nלהמשיך?`
+      ?`לחדר "${r?.name}" יש ${cnt} שיבוצים.\nמחיקת החדר תסיר גם את כל השיבוצים שלו.\nלהמשיך?`
       :`למחוק את "${r?.name}"?`;
     if(!confirm(msg))return;
     try{await deleteRoom(id);setRooms(rooms.filter(r=>r.id!==id));setSlots(slots.filter(s=>s.roomId!==id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
-  const addT=async()=>{if(!newTherapist.trim())return;try{await addTherapist(newTherapist.trim());setNewTherapist('');setError('');setTherapists(await getTherapists());}catch(e){setError(e.response?.data?.error||'שגיאה');}};
-  const renT=async(id,n)=>{try{await updateTherapist(id,n);setTherapists(p=>p.map(t=>t.id===id?{...t,name:n}:t));}catch(e){setError(e.response?.data?.error||'שגיאה');throw e;}};
+  const addT=async()=>{if(!newTherapist.trim())return;try{await addTherapist(newTherapist.trim());setNewTherapist('');setError('');setTherapists(await getTherapists());}catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}};
+  const renT=async(id,n)=>{try{await updateTherapist(id,n);setTherapists(p=>p.map(t=>t.id===id?{...t,name:n}:t));}catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');throw e;}};
   const delT=async(id)=>{
     const t=therapists.find(t=>t.id===id);
-    const slotRes=await getSchedule({from:'2020-01-01',to:'2030-12-31'}).catch(()=>[]);
+    const slotRes=await getSchedule({therapistId:id,from:'2020-01-01',to:'2030-12-31'}).catch(()=>[]);
     const cnt=Array.isArray(slotRes)?slotRes.filter(s=>s.therapistId===id).length:0;
     const msg=cnt>0
-      ?`למטפל "${t?.name}" יש ${cnt} שיבוצים.\nמחיקתו תמחק גם את כל השיבוצים שלו.\nלהמשיך?`
+      ?`למטפל "${t?.name}" יש ${cnt} שיבוצים.\nמחיקת המטפל תסיר גם את כל השיבוצים שלו.\nלהמשיך?`
       :`למחוק את "${t?.name}"?`;
     if(!confirm(msg))return;
     try{await deleteTherapist(id);setTherapists(therapists.filter(t=>t.id!==id));setSlots(slots.filter(s=>s.therapistId!==id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
   const saveSlot=async(id,sh,eh,tid,nt,rid,dt)=>{const u=await updateSlot(id,sh,eh,tid,nt,rid,dt);setSlots(p=>p.map(s=>s.id===id?{...s,...u}:s));};
 
@@ -280,7 +304,7 @@ export default function AdminPage(){
     if(endHour<=startHour){setEditRecurringErr('שעת הסיום חייבת להיות לאחר שעת ההתחלה');return;}
     if(frequency==='weekly'&&daysOfWeek.length===0){setEditRecurringErr('יש לבחור לפחות יום אחד');return;}
     if(endMode==='date'&&!endDate){setEditRecurringErr('יש לבחור תאריך סיום');return;}
-    if(endMode==='occurrences'&&(!occurrences||parseInt(occurrences)<1)){setEditRecurringErr('יש להזין מספר מופעים');return;}
+    if(endMode==='occurrences'&&(!occurrences||parseInt(occurrences)<1)){setEditRecurringErr('יש להזין מספר מפגשים');return;}
     setEditRecurringSaving(true);setEditRecurringErr('');
     try{
       const payload={roomId,therapistId,startHour,endHour,note:note||null,startDate,frequency,daysOfWeek,
@@ -292,7 +316,7 @@ export default function AdminPage(){
     }catch(e){
       const data=e.response?.data?.error;
       try{const parsed=JSON.parse(data);if(parsed.conflicts)setEditRecurringErr(`התנגשות ב-${parsed.conflicts.length} תאריכים`);}
-      catch{setEditRecurringErr(data||'שגיאה');}
+      catch{setEditRecurringErr(data||'לא הצלחנו לשמור את השינויים. נסו שוב.');}
     }finally{setEditRecurringSaving(false);}
   };
 
@@ -301,7 +325,7 @@ export default function AdminPage(){
     try{
       await deleteRecurring(parseInt(rid));
       setSlots(p=>p.filter(s=>s.recurringId!==parseInt(rid)));
-    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
 
   const [dragRoomId,setDragRoomId]=useState(null);
@@ -359,7 +383,7 @@ export default function AdminPage(){
       setSlots(p=>p.filter(s=>!deletedIds.has(s.id)));
       setManageDaysModal(prev=>({...prev,series:prev.series.filter(s=>!deletedIds.has(s.id))}));
       setManageDaysSelected(new Set());
-    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
     finally{setManageDaysDeleting(false);}
   };
   const [editSlot,setEditSlot]=useState(null); // {id,roomId,date,startHour,endHour,therapistId,note}
@@ -378,7 +402,7 @@ export default function AdminPage(){
       const updated=await updateSlot(id,startHour,endHour,therapistId,note||null,roomId,date);
       setSlots(p=>p.map(s=>s.id===id?{...s,...updated}:s));
       setEditSlot(null);
-    }catch(e){setEditSlotErr(e.response?.data?.error||'שגיאה');}
+    }catch(e){setEditSlotErr(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
     finally{setEditSlotSaving(false);}
   };
 
@@ -391,7 +415,7 @@ export default function AdminPage(){
   const confirmDeleteSingle=async()=>{
     const slot=deleteSingleModal;setDeleteSingleModal(null);
     try{await clearSlot(slot.id,'single');setSlots(p=>p.filter(s=>s.id!==slot.id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
 
   const confirmDelete=async(scope)=>{
@@ -400,7 +424,7 @@ export default function AdminPage(){
       await clearSlot(slot.id,scope);
       if(scope==='all'){setSlots(p=>p.filter(s=>s.recurringId!==slot.recurringId));}
       else{setSlots(p=>p.filter(s=>s.id!==slot.id));}
-    }catch(e){setError(e.response?.data?.error||'שגיאה');}
+    }catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
 
   // Apply therapist filter
@@ -444,6 +468,7 @@ export default function AdminPage(){
     return na-nb;
   });
 
+  if(authChecking)return <div className="text-center text-gray-400 py-20">טוען...</div>;
   if(!authed)return(
     <div className="max-w-sm mx-auto mt-16 px-4 fade-up">
       <div className="card rounded-2xl p-8">
@@ -469,6 +494,7 @@ export default function AdminPage(){
       if(res.slots){setSlots(p=>[...p,...res.slots]);}
       else if(res.slot){setSlots(p=>[...p,res.slot]);}
       setEditRequest(null);
+      refreshRequestsQuiet();
     }catch(e){
       const msg=e.response?.data?.error;
       let errText;
@@ -476,25 +502,25 @@ export default function AdminPage(){
         const parsed=JSON.parse(msg);
         if(parsed.conflicts&&parsed.conflicts.length===1){
           const c=parsed.conflicts[0];
-          errText=`החדר כבר תפוס ע"י ${c.therapist} (${c.startHour}:00–${c.endHour}:00) — יש לשנות שעה, תאריך או חדר`;
+          errText=`החדר כבר תפוס על ידי ${c.therapist} (${c.startHour}:00–${c.endHour}:00) — יש לשנות שעה, תאריך או חדר`;
         }else if(parsed.conflicts){
           errText=`התנגשות ב-${parsed.conflicts.length} תאריכים — יש לשנות שעה, תאריך או חדר`;
         }
-        else errText=msg||'שגיאה באישור הבקשה';
-      }catch{errText=msg||'שגיאה באישור הבקשה';}
+        else errText=msg||'לא הצלחנו לאשר את הבקשה. נסו שוב.';
+      }catch{errText=msg||'לא הצלחנו לאשר את הבקשה. נסו שוב.';}
       if(!editRequest){openEditRequest(req);}
       setEditRequestErr(errText);
     }
   };
   const handleRejectRequest=async(id)=>{
     if(!confirm('לדחות את הבקשה?'))return;
-    try{await rejectBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    try{await rejectBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));refreshRequestsQuiet();}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
   const handleDeleteRequest=async(id)=>{
     if(!confirm('למחוק את הבקשה לצמיתות?'))return;
-    try{await deleteBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));}
-    catch(e){setError(e.response?.data?.error||'שגיאה');}
+    try{await deleteBookingRequest(id);setBookingRequests(p=>p.filter(r=>r.id!==id));refreshRequestsQuiet();}
+    catch(e){setError(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
   };
   const openEditRequest=(req)=>{
     setEditRequest({
@@ -516,7 +542,7 @@ export default function AdminPage(){
       const updated=await updateBookingRequest(id,{therapistName,roomId,date,startHour,endHour,note:note||null});
       setBookingRequests(p=>p.map(r=>r.id===id?{...r,...updated}:r));
       setEditRequest(null);
-    }catch(e){setEditRequestErr(e.response?.data?.error||'שגיאה');}
+    }catch(e){setEditRequestErr(e.response?.data?.error||'לא הצלחנו לבצע את הפעולה. נסו שוב.');}
     finally{setEditRequestSaving(false);}
   };
 
@@ -615,14 +641,14 @@ export default function AdminPage(){
                   <button type="button"
                     onClick={()=>setEditRecurring(p=>({...p,endMode:'occurrences'}))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${editRecurring.endMode==='occurrences'?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                    מספר מופעים
+                    מספר מפגשים
                   </button>
                 </div>
                 {editRecurring.endMode==='date'?(
                   <input type="date" dir="ltr" className="input py-2 text-sm" value={editRecurring.endDate}
                     onChange={e=>setEditRecurring(p=>({...p,endDate:e.target.value}))}/>
                 ):(
-                  <input type="number" min="1" max="500" className="input py-2 text-sm" placeholder="מספר מופעים"
+                  <input type="number" min="1" max="500" className="input py-2 text-sm" placeholder="מספר מפגשים"
                     value={editRecurring.occurrences}
                     onChange={e=>setEditRecurring(p=>({...p,occurrences:e.target.value}))}/>
                 )}
@@ -647,7 +673,7 @@ export default function AdminPage(){
               {editRecurringErr&&<p className="text-red-500 text-xs">{editRecurringErr}</p>}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveRecurring} disabled={editRecurringSaving} className="btn-primary flex-1 py-2.5 text-sm">
-                  {editRecurringSaving?'שומר...':'שמור שינויים'}
+                  {editRecurringSaving?'שומר...':'שמירת שינויים'}
                 </button>
                 <button onClick={()=>setEditRecurring(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
               </div>
@@ -679,13 +705,13 @@ export default function AdminPage(){
                   {manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0&&
                     <Check size={10} className="text-white"/>}
                 </div>
-                {manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0?'בטל הכל':'בחר הכל'}
+                {manageDaysSelected.size===manageDaysModal.series.length&&manageDaysModal.series.length>0?'ביטול הבחירה':'בחירת הכול'}
               </button>
               {manageDaysSelected.size>0&&(
                 <button type="button" onClick={deleteSelectedDays} disabled={manageDaysDeleting}
                   className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50">
                   <Trash2 size={13}/>
-                  {manageDaysDeleting?'מוחק...': `מחק ${manageDaysSelected.size} ${manageDaysSelected.size===1?'יום':'ימים'}`}
+                  {manageDaysDeleting?'מוחק...': `מחיקת ${manageDaysSelected.size} ${manageDaysSelected.size===1?'יום':'ימים'}`}
                 </button>
               )}
             </div>
@@ -724,7 +750,7 @@ export default function AdminPage(){
                           </td>
                           <td className="py-2.5 px-3">
                             <span className={`font-medium ${isPast?'text-gray-400':'text-gray-700'}`}>
-                              {d.getDate()} {MONTHS_HE[d.getMonth()]} {d.getFullYear()}
+                              {d.getDate()} ב{MONTHS_HE[d.getMonth()]} {d.getFullYear()}
                             </span>
                             {isPast&&<span className="mr-1.5 text-xs text-gray-300">עבר</span>}
                           </td>
@@ -740,9 +766,9 @@ export default function AdminPage(){
             {/* Footer */}
             <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                {manageDaysSelected.size>0?`${manageDaysSelected.size} נבחרו`:'לחץ על שורה לבחירה'}
+                {manageDaysSelected.size>0?`${manageDaysSelected.size} נבחרו`:'לחצו על שורה לבחירה'}
               </span>
-              <button onClick={()=>{if(manageDaysModal?.editRecurringSnapshot)setEditRecurring(manageDaysModal.editRecurringSnapshot);setManageDaysModal(null);}} className="btn-secondary px-4 py-2 text-sm">← חזור לעריכה</button>
+              <button onClick={()=>{if(manageDaysModal?.editRecurringSnapshot)setEditRecurring(manageDaysModal.editRecurringSnapshot);setManageDaysModal(null);}} className="btn-secondary px-4 py-2 text-sm">← חזרה לעריכה</button>
             </div>
           </div>
         </div>
@@ -794,7 +820,7 @@ export default function AdminPage(){
               {editSlotErr&&<p className="text-red-500 text-xs">{editSlotErr}</p>}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveEditSlot} disabled={editSlotSaving} className="btn-primary flex-1 py-2.5 text-sm">
-                  {editSlotSaving?'שומר...':'שמור שינויים'}
+                  {editSlotSaving?'שומר...':'שמירת שינויים'}
                 </button>
                 <button onClick={()=>setEditSlot(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
               </div>
@@ -809,10 +835,10 @@ export default function AdminPage(){
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center"><Trash2 size={18} className="text-red-500"/></div>
               <h3 className="font-bold text-gray-800">מחיקת שיבוץ חוזר</h3>
             </div>
-            <p className="text-sm text-gray-600 mb-4">שיבוץ זה הוא חלק מסדרה חוזרת. מה ברצונך למחוק?</p>
+            <p className="text-sm text-gray-600 mb-4">שיבוץ זה הוא חלק מסדרה חוזרת. מה למחוק?</p>
             <div className="space-y-2">
-              <button onClick={()=>confirmDelete('single')} className="w-full text-right px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition-colors">מחק רק שיבוץ זה</button>
-              <button onClick={()=>confirmDelete('all')} className="w-full text-right px-4 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-medium text-red-600 transition-colors">מחק את כל הסדרה ({slots.filter(s=>s.recurringId===deleteModal.recurringId).length} שיבוצים)</button>
+              <button onClick={()=>confirmDelete('single')} className="w-full text-right px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-medium text-gray-700 transition-colors">מחיקת שיבוץ זה בלבד</button>
+              <button onClick={()=>confirmDelete('all')} className="w-full text-right px-4 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-medium text-red-600 transition-colors">מחיקת כל הסדרה ({slots.filter(s=>s.recurringId===deleteModal.recurringId).length} שיבוצים)</button>
               <button onClick={()=>setDeleteModal(null)} className="w-full text-right px-4 py-3 text-sm text-gray-400 hover:text-gray-600 transition-colors">ביטול</button>
             </div>
           </div>
@@ -831,7 +857,7 @@ export default function AdminPage(){
             </p>
             <p className="text-sm text-gray-400 mb-5">{formatDateHe(toDateStr(new Date(deleteSingleModal.date)))}</p>
             <div className="flex gap-2">
-              <button onClick={confirmDeleteSingle} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">מחק</button>
+              <button onClick={confirmDeleteSingle} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">מחיקה</button>
               <button onClick={()=>setDeleteSingleModal(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
             </div>
           </div>
@@ -841,13 +867,13 @@ export default function AdminPage(){
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={()=>setHolidayModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-800 flex items-center gap-2">🗓️ הוספת חג / חופשה</h3>
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">🗓️ הוספת חג או חופשה</h3>
               <button onClick={()=>setHolidayModal(false)} className="text-gray-300 hover:text-gray-500"><X size={18}/></button>
             </div>
             <p className="text-xs text-gray-400 mb-4">חסימה זו תחול על כל {rooms.length} החדרים בו-זמנית</p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">שם החג / החופשה</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">שם החג או החופשה</label>
                 <input className="input py-2 text-sm" placeholder='למשל: "חג פסח", "חופשת קיץ"'
                   value={holidayForm.message} onChange={e=>setHolidayForm(p=>({...p,message:e.target.value}))} maxLength={200}/>
               </div>
@@ -866,7 +892,7 @@ export default function AdminPage(){
               {holidayError&&<p className="text-red-500 text-xs">{holidayError}</p>}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveHoliday} disabled={holidaySaving} className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-1.5">
-                  {holidaySaving?'שומר...':'חסום את כל החדרים'}
+                  {holidaySaving?'שומר...':'חסימת כל החדרים'}
                 </button>
                 <button onClick={()=>setHolidayModal(false)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
               </div>
@@ -924,7 +950,7 @@ export default function AdminPage(){
                     ?'bg-red-50 border-red-200 text-red-700'
                     :'bg-gray-50 border-gray-200 text-gray-600'
                 }`}>
-                <span className="text-sm font-medium">חסום שיבוצים בתקופת ההערה</span>
+                <span className="text-sm font-medium">חסימת שיבוצים בתקופת ההערה</span>
                 <div dir="ltr" className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${noteForm.blocksBooking?'bg-red-500':'bg-gray-300'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${noteForm.blocksBooking?'translate-x-4':'translate-x-0'}`}/>
                 </div>
@@ -932,7 +958,7 @@ export default function AdminPage(){
               {noteError&&<p className="text-red-500 text-xs">{noteError}</p>}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveNote} disabled={noteSaving} className="btn-primary flex-1 py-2.5 text-sm">
-                  {noteSaving?'שומר...':'הוסף הערה'}
+                  {noteSaving?'שומר...':'הוספת הערה'}
                 </button>
                 <button onClick={()=>setNoteModal(null)} className="btn-secondary px-4 py-2.5 text-sm">ביטול</button>
               </div>
@@ -942,8 +968,8 @@ export default function AdminPage(){
       )}
       <div className="fade-up">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="section-title">פאנל מנהל</h1>
-        <button onClick={()=>{sessionStorage.removeItem('adminPass');setAuthed(false);}} className="btn-ghost text-sm px-3 py-1.5">יציאה</button>
+        <h1 className="section-title">הגדרות מנהל</h1>
+        <button onClick={logoutAdmin} className="btn-ghost text-sm px-3 py-1.5">יציאה</button>
       </div>
 
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
@@ -959,6 +985,8 @@ export default function AdminPage(){
       </div>
 
       {error&&<div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-4 text-sm">{error}</div>}
+
+      {loadError&&tab!=='requests'&&<RouteError error={loadError} onRetry={()=>{setLoadError(null);loadAll(filterYear,filterMonths);}} compact/>}
 
       {/* Schedule filters — only shown on schedule tab */}
       {tab==='schedule'&&(
@@ -1001,7 +1029,7 @@ export default function AdminPage(){
         </div>
       )}
 
-      {tab==='rooms'&&(
+      {tab==='rooms'&&!(loadError&&rooms.length===0)&&(
         <div className="space-y-4">
           {/* Holidays section */}
           {(()=>{
@@ -1017,13 +1045,13 @@ export default function AdminPage(){
             return(
               <div className="card rounded-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <span className="font-semibold text-gray-700 text-sm flex items-center gap-1.5">🗓️ ימי חג / חופשות</span>
+                  <span className="font-semibold text-gray-700 text-sm flex items-center gap-1.5">🗓️ ימי חג וחופשות</span>
                   <button onClick={()=>{setHolidayModal(true);setHolidayForm({message:'',startDate:'',endDate:''});setHolidayError('');}}
                     className="flex items-center gap-1 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors">
-                    <Plus size={13}/> הוסף חג / חופשה
+                    <Plus size={13}/> הוספת חג או חופשה
                   </button>
                 </div>
-                {holidays.length===0&&<p className="text-gray-400 text-sm text-center py-4">אין חגים / חופשות מוגדרים</p>}
+                {holidays.length===0&&<p className="text-gray-400 text-sm text-center py-4">אין חגים או חופשות מוגדרים</p>}
                 {holidays.map(({message,startDate,endDate,count})=>(
                   <div key={`${message}|||${startDate}|||${endDate}`} className="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-0">
                     <div>
@@ -1043,7 +1071,7 @@ export default function AdminPage(){
           <div className="flex gap-2">
             <input type="text" placeholder="שם חדר חדש" className="input" value={newRoom}
               onChange={e=>setNewRoom(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addR()}/>
-            <button onClick={addR} className="btn-primary px-4 py-2.5 flex items-center gap-1 whitespace-nowrap"><Plus size={16}/> הוסף</button>
+            <button onClick={addR} className="btn-primary px-4 py-2.5 flex items-center gap-1 whitespace-nowrap"><Plus size={16}/> הוספה</button>
           </div>
           <div className="card rounded-2xl overflow-hidden">
             {rooms.length===0&&<p className="text-gray-400 text-sm text-center py-6">אין חדרים</p>}
@@ -1092,12 +1120,12 @@ export default function AdminPage(){
         </div>
       )}
 
-      {tab==='therapists'&&(
+      {tab==='therapists'&&!(loadError&&rooms.length===0)&&(
         <div className="space-y-4">
           <div className="flex gap-2">
             <input type="text" placeholder="שם מטפל חדש" className="input" value={newTherapist}
               onChange={e=>setNewTherapist(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addT()}/>
-            <button onClick={addT} className="btn-primary px-4 py-2.5 flex items-center gap-1 whitespace-nowrap"><Plus size={16}/> הוסף</button>
+            <button onClick={addT} className="btn-primary px-4 py-2.5 flex items-center gap-1 whitespace-nowrap"><Plus size={16}/> הוספה</button>
           </div>
           <div className="card rounded-2xl overflow-hidden">
             {therapists.length===0&&<p className="text-gray-400 text-sm text-center py-6">אין מטפלים</p>}
@@ -1106,7 +1134,7 @@ export default function AdminPage(){
         </div>
       )}
 
-      {tab==='schedule'&&(
+      {tab==='schedule'&&!(loadError&&rooms.length===0)&&(
         <div className="space-y-6">
 
           {sortedRoomIds.length>0&&(
@@ -1194,11 +1222,13 @@ export default function AdminPage(){
 
       {tab==='requests'&&(
         <div className="space-y-3">
+          <NotifyEmailCard/>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-gray-500">{requestsLoading?'טוען...':bookingRequests.length===0?'אין בקשות ממתינות':`${bookingRequests.length} בקשות ממתינות לאישור`}</p>
-            <button onClick={loadRequests} className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"><RefreshCw size={13}/> רענן</button>
+            <p className="text-sm text-gray-500">{requestsLoading?'טוען...':requestsError?'':bookingRequests.length===0?'אין בקשות ממתינות':`${bookingRequests.length} בקשות ממתינות לאישור`}</p>
+            <button onClick={loadRequests} className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"><RefreshCw size={13}/> רענון</button>
           </div>
-          {bookingRequests.length===0&&!requestsLoading&&(
+          {requestsError&&!requestsLoading&&<RouteError error={requestsError} onRetry={loadRequests} compact/>}
+          {bookingRequests.length===0&&!requestsLoading&&!requestsError&&(
             <div className="card rounded-2xl p-10 text-center">
               <Inbox size={36} className="text-gray-300 mx-auto mb-3"/>
               <p className="text-gray-400 text-sm">אין בקשות שיבוץ ממתינות</p>
@@ -1224,22 +1254,22 @@ export default function AdminPage(){
                   <button
                     onClick={()=>handleApproveRequest(req)}
                     className="flex items-center gap-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg px-3 py-2 transition-colors">
-                    <CheckCircle2 size={14}/> אשר שיבוץ
+                    <CheckCircle2 size={14}/> אישור שיבוץ
                   </button>
                   <button
                     onClick={()=>openEditRequest(req)}
                     className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 transition-colors">
-                    <Pencil size={13}/> ערוך ואשר
+                    <Pencil size={13}/> עריכה ואישור
                   </button>
                   <button
                     onClick={()=>handleRejectRequest(req.id)}
                     className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 rounded-lg px-3 py-2 transition-colors">
-                    <XCircle size={14}/> דחה
+                    <XCircle size={14}/> דחייה
                   </button>
                   <button
                     onClick={()=>handleDeleteRequest(req.id)}
                     className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200 rounded-lg px-3 py-2 transition-colors mr-auto">
-                    <Trash2 size={13}/> מחק
+                    <Trash2 size={13}/> מחיקה
                   </button>
                 </div>
                 <div className="px-4 py-1.5 border-t border-gray-50 text-xs text-gray-300">
@@ -1248,6 +1278,25 @@ export default function AdminPage(){
               </div>
             );
           })}
+          {queuedRequests.length>0&&(
+            <div className="card rounded-2xl p-4 space-y-3">
+              <p className="font-bold text-gray-700 text-sm">בתור ({queuedRequests.length})</p>
+              <p className="text-xs text-gray-500">הבקשות בתור יועברו להמתנה אוטומטית ככל שתטפלו בבקשות הממתינות.</p>
+              <button onClick={()=>setShowQueued(v=>!v)} aria-expanded={showQueued}
+                className="btn-ghost text-xs px-3 py-2 min-h-[44px] flex items-center gap-1.5">
+                {showQueued?<ChevronUp size={14}/>:<ChevronDown size={14}/>} הצגת הבקשות בתור
+              </button>
+              {showQueued&&queuedRequests.map(req=>(
+                <div key={req.id} className="rounded-xl border border-gray-100 px-3 py-2.5 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-800 text-sm">{req.therapistName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{formatDateHe(toDateStr(new Date(req.date)))} · {hLabel(req.startHour)}–{hLabel(req.endHour)} · {BOOKING_TYPE_HE[req.bookingType]||'חד-פעמי'}</p>
+                  </div>
+                  <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2.5 py-1 rounded-full shrink-0">{req.room?.name||'חדר לא ידוע'}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       </div>
@@ -1312,13 +1361,13 @@ export default function AdminPage(){
                   })}
                   disabled={editRequestSaving}
                   className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-1.5">
-                  <CheckCircle2 size={15}/> {editRequestSaving?'מאשר...':'אשר שיבוץ'}
+                  <CheckCircle2 size={15}/> {editRequestSaving?'מאשר...':'אישור שיבוץ'}
                 </button>
                 <button
                   onClick={saveEditRequest}
                   disabled={editRequestSaving}
                   className="btn-secondary px-4 py-2.5 text-sm">
-                  שמור בלבד
+                  שמירה בלבד
                 </button>
               </div>
             </div>

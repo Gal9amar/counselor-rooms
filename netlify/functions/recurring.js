@@ -1,5 +1,6 @@
 const prisma = require('./lib/prisma');
-const { ok, err, cors, toMidnightUTC, toDateStr, generateDates } = require('./lib/helpers');
+const { ok, err, cors, checkAdmin, toMidnightUTC, toDateStr, generateDates, handleError, isId, isHour } = require('./lib/helpers');
+const HOURS_RANGE_MSG = 'שעות לא תקינות. שעת ההתחלה בין 8:00 ל-21:00 ושעת הסיום בין 9:00 ל-22:00';
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -8,7 +9,9 @@ exports.handler = async (event) => {
 
   try {
     // POST /api/recurring — create a new recurring series
+    // Admin only (regular users use POST /api/booking-requests)
     if (httpMethod === 'POST') {
+      if (!checkAdmin(event.headers)) return err('Unauthorized', 401);
       const {
         roomId,
         therapistId,
@@ -25,18 +28,27 @@ exports.handler = async (event) => {
 
       // Validate required fields
       if (!roomId || !therapistId || startHour == null || endHour == null || !frequency || !startDate)
-        return err('roomId, therapistId, startHour, endHour, frequency, startDate נדרשים', 400);
+        return err('יש למלא חדר, מטפל, שעת התחלה, שעת סיום, תדירות ותאריך התחלה', 400);
+      if (!isId(roomId) || !isId(therapistId)) return err('שדות לא תקינים', 400);
+      if (!isHour(startHour) || !isHour(endHour)) return err(HOURS_RANGE_MSG, 400);
       if (endHour <= startHour)
-        return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
+        return err('שעת הסיום חייבת להיות אחרי שעת ההתחלה', 400);
+      if (!['daily', 'weekly', 'monthly'].includes(frequency) || typeof startDate !== 'string' || isNaN(new Date(startDate)))
+        return err('שדות לא תקינים', 400);
+      if ((endDate != null && (typeof endDate !== 'string' || isNaN(new Date(endDate)))) ||
+          (occurrences != null && !(Number.isInteger(occurrences) && occurrences >= 1 && occurrences <= 365)) ||
+          (daysOfWeek != null && !(Array.isArray(daysOfWeek) && daysOfWeek.length <= 7 && daysOfWeek.every(d => Number.isInteger(d) && d >= 0 && d <= 6))) ||
+          (note != null && typeof note !== 'string'))
+        return err('שדות לא תקינים', 400);
       if (!endDate && !occurrences)
-        return err('יש לספק endDate או occurrences', 400);
+        return err('יש לבחור תאריך סיום או מספר מפגשים', 400);
       if (frequency === 'weekly' && (!daysOfWeek || daysOfWeek.length === 0))
         return err('יש לבחור לפחות יום אחד בשבוע', 400);
 
       // Generate all target dates
       const dates = generateDates({ frequency, daysOfWeek: daysOfWeek || [], startDate, endDate, occurrences });
       if (dates.length === 0)
-        return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
+        return err('לא נמצאו תאריכים בטווח שנבחר. בדקו את הגדרות הסדרה', 400);
 
       // Check conflicts for ALL dates in ONE query
       const [overlapping, pendingConflicts] = await Promise.all([
@@ -119,16 +131,25 @@ exports.handler = async (event) => {
 
       const parts = path.split('/').filter(Boolean);
       const id = parseInt(parts[parts.length - 1]);
-      if (isNaN(id)) return err('id לא תקין', 400);
+      if (isNaN(id)) return err('מזהה הסדרה לא תקין', 400);
 
       const { roomId, therapistId, startHour, endHour, note, startDate, frequency, daysOfWeek, endDate, occurrences } = JSON.parse(body || '{}');
       if (!roomId || !therapistId || startHour == null || endHour == null)
-        return err('roomId, therapistId, startHour, endHour נדרשים', 400);
+        return err('יש למלא חדר, מטפל, שעת התחלה ושעת סיום', 400);
+      if (!isId(id) || !isId(roomId) || !isId(therapistId)) return err('שדות לא תקינים', 400);
+      if (!isHour(startHour) || !isHour(endHour)) return err(HOURS_RANGE_MSG, 400);
       if (endHour <= startHour)
-        return err('שעת סיום חייבת להיות אחרי שעת התחלה', 400);
+        return err('שעת הסיום חייבת להיות אחרי שעת ההתחלה', 400);
+      if ((frequency != null && !['daily', 'weekly', 'monthly'].includes(frequency)) ||
+          (startDate != null && (typeof startDate !== 'string' || isNaN(new Date(startDate)))) ||
+          (endDate != null && endDate !== '' && (typeof endDate !== 'string' || isNaN(new Date(endDate)))) ||
+          (occurrences != null && occurrences !== '' && !(Number.isInteger(occurrences) && occurrences >= 1 && occurrences <= 365)) ||
+          (daysOfWeek != null && !(Array.isArray(daysOfWeek) && daysOfWeek.length <= 7 && daysOfWeek.every(d => Number.isInteger(d) && d >= 0 && d <= 6))) ||
+          (note != null && typeof note !== 'string'))
+        return err('שדות לא תקינים', 400);
 
       const existing = await prisma.recurringSchedule.findUnique({ where: { id } });
-      if (!existing) return err('סדרה לא נמצאה', 404);
+      if (!existing) return err('הסדרה לא נמצאה. ייתכן שהיא נמחקה', 404);
 
       const newFrequency = frequency || existing.frequency;
       const newDaysOfWeek = daysOfWeek !== undefined ? daysOfWeek : existing.daysOfWeek;
@@ -154,7 +175,7 @@ exports.handler = async (event) => {
           endDate: newEndDate,
           occurrences: newOccurrences,
         });
-        if (newDates.length === 0) return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
+        if (newDates.length === 0) return err('לא נמצאו תאריכים בטווח שנבחר. בדקו את הגדרות הסדרה', 400);
 
         // Check conflicts for new dates (exclude this series)
         const overlapping = await prisma.scheduleSlot.findMany({
@@ -227,10 +248,10 @@ exports.handler = async (event) => {
 
       const parts = path.split('/').filter(Boolean);
       const id = parseInt(parts[parts.length - 1]);
-      if (isNaN(id)) return err('id לא תקין', 400);
+      if (isNaN(id)) return err('מזהה הסדרה לא תקין', 400);
 
       const existing = await prisma.recurringSchedule.findUnique({ where: { id } });
-      if (!existing) return err('סדרה לא נמצאה', 404);
+      if (!existing) return err('הסדרה לא נמצאה. ייתכן שהיא נמחקה', 404);
 
       await prisma.scheduleSlot.deleteMany({ where: { recurringId: id } });
       await prisma.recurringSchedule.delete({ where: { id } });
@@ -240,6 +261,6 @@ exports.handler = async (event) => {
 
     return err('Method not allowed', 405);
   } catch (e) {
-    return err(e.message);
+    return handleError(e, 'recurring');
   }
 };

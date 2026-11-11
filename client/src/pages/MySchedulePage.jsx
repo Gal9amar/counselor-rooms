@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { getTherapists, getSchedule } from '../services/api';
+import React, { useEffect, useRef, useState } from 'react';
+import { getTherapists, getSchedule, getScheduleSilent } from '../services/api';
+import RouteError from '../components/RouteError';
 import { Clock, MapPin, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -25,8 +26,16 @@ export default function MySchedulePage() {
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
 
+  const [loadError, setLoadError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const loadedRange = useRef(null);
+  const retry = () => { setLoadError(null); setRetryKey(k => k + 1); };
+
   useEffect(() => {
-    getTherapists().then(setTherapists);
+    getTherapists().then(t => { setTherapists(t); setLoadError(null); }).catch(setLoadError);
+  }, [retryKey]);
+
+  useEffect(() => {
     const saved = localStorage.getItem('myScheduleTherapistId');
     if (saved) setSelectedId(saved);
   }, []);
@@ -35,12 +44,34 @@ export default function MySchedulePage() {
     if (!selectedId) { setSlots([]); return; }
     localStorage.setItem('myScheduleTherapistId', selectedId);
     setLoading(true);
-    const past = new Date('2020-01-01');
-    const future = new Date(); future.setFullYear(future.getFullYear() + 2);
-    getSchedule({ from: toDateStr(past), to: toDateStr(future) })
-      .then(all => setSlots(all.filter(s => s.therapistId === parseInt(selectedId))))
+    const tid = parseInt(selectedId);
+    const n = new Date();
+    const range = { from: toDateStr(new Date(n.getFullYear(), n.getMonth() - 3, 1)), to: toDateStr(new Date(n.getFullYear(), n.getMonth() + 13, 0)) };
+    loadedRange.current = range;
+    getSchedule({ therapistId: tid, ...range })
+      .then(all => { setSlots(all.filter(s => s.therapistId === tid)); setLoadError(null); })
+      .catch(setLoadError)
       .finally(() => setLoading(false));
-  }, [selectedId]);
+  }, [selectedId, retryKey]);
+
+  // Extend the loaded range when the user navigates outside it (merge, no loading overlay flash on results)
+  useEffect(() => {
+    if (!selectedId || !loadedRange.current) return;
+    const tid = parseInt(selectedId);
+    const from = toDateStr(new Date(viewYear, viewMonth, 1));
+    const to = toDateStr(new Date(viewYear, viewMonth + 1, 0));
+    const lr = loadedRange.current;
+    if (from >= lr.from && to <= lr.to) return;
+    const want = { from: from < lr.from ? from : lr.from, to: to > lr.to ? to : lr.to };
+    // load only the missing side (months are navigated one by one, so the range stays contiguous)
+    const side = from < lr.from ? { from, to: lr.from } : { from: lr.to, to };
+    getScheduleSilent({ therapistId: tid, ...side })
+      .then(more => {
+        setSlots(prev => { const ids = new Set(prev.map(x => x.id)); return [...prev, ...more.filter(x => x.therapistId === tid && !ids.has(x.id))]; });
+        loadedRange.current = want;
+      })
+      .catch(setLoadError);
+  }, [viewYear, viewMonth, selectedId, retryKey]);
 
   const today = new Date(); today.setHours(0,0,0,0);
   const todayStr = toDateStr(today);
@@ -85,7 +116,7 @@ export default function MySchedulePage() {
     const d = new Date(ds+'T00:00:00');
     const diff = Math.round((d-today)/(1000*60*60*24));
     if (diff===1) return 'מחר';
-    return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+    return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]}`;
   }
 
   function slotStatus(s) {
@@ -116,22 +147,24 @@ export default function MySchedulePage() {
           value={selectedId}
           onChange={e => setSelectedId(e.target.value)}
         >
-          <option value="">בחר את שמך</option>
+          <option value="">בחרו שם</option>
           {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 text-xs">▾</div>
       </div>
 
-      {!selectedId && (
+      {loadError && !loading && <RouteError error={loadError} onRetry={retry} compact />}
+
+      {!selectedId && !loadError && (
         <div className="card rounded-2xl p-12 text-center">
           <User size={40} className="mx-auto mb-3 text-gray-200"/>
-          <p className="text-gray-400">בחר שם מהרשימה לצפייה בשיבוצים</p>
+          <p className="text-gray-400">בחרו שם מהרשימה כדי לצפות בשיבוצים</p>
         </div>
       )}
 
       {selectedId && loading && <div className="text-center text-gray-400 py-16">טוען...</div>}
 
-      {selectedId && !loading && (
+      {selectedId && !loading && !loadError && (
         <>
           {/* Next slot hero */}
           {nextSlot && (
@@ -144,7 +177,7 @@ export default function MySchedulePage() {
                 <div className="flex-1">
                   <p className="text-xl font-bold text-gray-800">{formatNextDate(toDateStr(new Date(nextSlot.date)))}</p>
                   <div className="flex flex-wrap gap-3 mt-1.5 text-sm text-gray-600">
-                    <span className="flex items-center gap-1"><Clock size={13} className="text-green-500"/>{hLabel(nextSlot.startHour)} – {hLabel(nextSlot.endHour)}</span>
+                    <span className="flex items-center gap-1"><Clock size={13} className="text-green-500"/>{hLabel(nextSlot.startHour)}–{hLabel(nextSlot.endHour)}</span>
                     <span className="flex items-center gap-1"><MapPin size={13} className="text-green-500"/>{nextSlot.room.name}</span>
                   </div>
                   {nextSlot.note && (
@@ -195,7 +228,7 @@ export default function MySchedulePage() {
                     <div className={`px-4 py-2.5 border-b flex items-center justify-between ${isToday?'bg-green-50 border-green-100':'bg-gray-50 border-gray-100'}`}>
                       <div className="flex items-center gap-2">
                         <span className={`font-bold text-sm ${isToday?'text-green-700':'text-gray-700'}`}>{DAYS_HE[d.getDay()]}</span>
-                        <span className={`text-sm ${isToday?'text-green-600':'text-gray-400'}`}>{d.getDate()} {MONTHS_HE[d.getMonth()]}</span>
+                        <span className={`text-sm ${isToday?'text-green-600':'text-gray-400'}`}>{d.getDate()} ב{MONTHS_HE[d.getMonth()]}</span>
                         {isToday && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">היום</span>}
                       </div>
                       <span className="text-xs text-gray-400">{daySlots.length} שיבוצים · {dayHours} שעות</span>
@@ -262,7 +295,7 @@ export default function MySchedulePage() {
                               <div className="flex items-center justify-between gap-2">
                                 <span className={`font-medium text-sm ${status==='past'?'text-gray-400':'text-gray-700'}`}>{s.room.name}</span>
                                 <span className={`text-sm font-semibold shrink-0 ${status==='past'?'text-gray-300':status==='active'?'text-green-600':col.text}`}>
-                                  {hLabel(s.startHour)} – {hLabel(s.endHour)}
+                                  {hLabel(s.startHour)}–{hLabel(s.endHour)}
                                 </span>
                               </div>
                               {s.note && (

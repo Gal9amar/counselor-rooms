@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { handleAdminDenied, ADMIN_ONLY_MESSAGE } from '../services/adminAuth';
 import { getScheduleSilent, getRoomNotesSilent, bookSlotSilent, bookRecurringSilent } from '../services/api';
 import { X, ChevronLeft, ChevronRight, Repeat2, CalendarDays, CalendarRange, AlertTriangle } from 'lucide-react';
 
@@ -18,7 +19,7 @@ function toDateStr(d) {
 function hLabel(h) { return `${h}:00`; }
 function formatDateHe(ds) {
   const d = new Date(ds + 'T00:00:00');
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
+  return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
 }
 function formatShort(ds) {
   const d = new Date(ds + 'T00:00:00');
@@ -278,13 +279,13 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
     if (!therapistId) { setBookError('נא לבחור שם'); return; }
     const tName = therapists.find(t => t.id === parseInt(therapistId))?.name || '';
     if (tName === 'אגף רווחה' && !note.trim()) { setBookError('עבור אגף הרווחה יש למלא הערה'); return; }
-    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלו'); return; }
+    if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) { setBookError('קיים שיבוץ חופף בשעות אלה'); return; }
 
     setBooking(true); setBookError('');
 
     if (isRecurring) {
       if (recurFrequency === 'weekly' && recurDays.length === 0) { setBookError('יש לבחור לפחות יום אחד'); setBooking(false); return; }
-      if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setBookError('יש להזין מספר מופעים'); setBooking(false); return; }
+      if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setBookError('יש להזין מספר מפגשים'); setBooking(false); return; }
       if (recurEndMode === 'date' && !recurEndDate) { setBookError('יש לבחור תאריך סיום'); setBooking(false); return; }
       try {
         const result = await bookRecurringSilent({
@@ -303,13 +304,14 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
         onSuccess(result.slots);
         onClose();
       } catch (e) {
+        if (handleAdminDenied(e)) { setBookError(ADMIN_ONLY_MESSAGE); setBooking(false); return; }
         const data = e.response?.data?.error;
         try {
           const parsed = JSON.parse(data);
           if (parsed.pendingConflict) setPendingConflictInfo({ type: 'recurring', conflicts: parsed.conflicts });
           else if (parsed.conflicts) setConflictModal(parsed.conflicts);
-          else setBookError(data || 'שגיאה');
-        } catch { setBookError(data || 'שגיאה'); }
+          else setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+        } catch { setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.'); }
       }
     } else {
       try {
@@ -318,12 +320,13 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
         onSuccess([slot]);
         onClose();
       } catch (e) {
+        if (handleAdminDenied(e)) { setBookError(ADMIN_ONLY_MESSAGE); setBooking(false); return; }
         const data = e.response?.data?.error;
         try {
           const parsed = JSON.parse(data);
           if (parsed.pendingConflict) setPendingConflictInfo({ type: 'single', conflicts: parsed.conflicts });
-          else setBookError(data || 'שגיאה');
-        } catch { setBookError(data || 'שגיאה'); }
+          else setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+        } catch { setBookError(data || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.'); }
       }
     }
     setBooking(false);
@@ -355,7 +358,10 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
         onSuccess([slot]);
         onClose();
       }
-    } catch (e) { setBookError(e.response?.data?.error || 'שגיאה'); }
+    } catch (e) {
+      if (handleAdminDenied(e)) setBookError(ADMIN_ONLY_MESSAGE);
+      else setBookError(e.response?.data?.error || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.');
+    }
     setBooking(false);
   };
 
@@ -375,7 +381,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
     if (!scatterStart || !end || end <= scatterStart) return;
     const hasConflict = Array.from({ length: end - scatterStart }, (_, i) => scatterStart + i)
       .some(x => occupiedHoursForPending.has(x) || blockedHoursForPending.has(x));
-    if (hasConflict) { setBookError('הטווח שנבחר חופף שיבוץ קיים בחדר'); return; }
+    if (hasConflict) { setBookError('הטווח שנבחר חופף לשיבוץ קיים בחדר'); return; }
     setBookError('');
     setScatterEntries(prev => [...prev, {
       id: crypto.randomUUID(),
@@ -406,7 +412,13 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
         saved.push({ ...entry, slot });
         setAllSlots(p => [...p, slot]);
       } catch (e) {
-        const msg = e.response?.data?.error || 'שגיאה';
+        if (handleAdminDenied(e)) {
+          // Admin-only: stop sending the rest of the dates
+          const i = scatterEntries.indexOf(entry);
+          scatterEntries.slice(i).forEach(en => failed.push({ ...en, error: ADMIN_ONLY_MESSAGE }));
+          break;
+        }
+        const msg = e.response?.data?.error || 'לא הצלחנו לשמור את השיבוץ. נסו שוב.';
         failed.push({ ...entry, error: msg });
       }
     }
@@ -459,8 +471,8 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
             <div>
               <h2 className="text-lg font-bold text-gray-800">{room.name}</h2>
               <p className="text-xs text-gray-400">
-                {step === 'mode' && 'בחר סוג שיבוץ'}
-                {step === 'calendar' && 'בחר תאריך'}
+                {step === 'mode' && 'בחרו סוג שיבוץ'}
+                {step === 'calendar' && 'בחרו תאריך'}
                 {step === 'hour' && selectedDate && `${formatDateHe(selectedDate)} · ${isRecurring ? 'שיבוץ חוזר' : 'שיבוץ יחיד'}`}
                 {step === 'scatter' && 'שיבוץ תפזורת'}
               </p>
@@ -568,7 +580,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                   />
                   {isRecurring && (
                     <p className="text-xs text-blue-600 text-center mt-3 flex items-center justify-center gap-1">
-                      <Repeat2 size={12} /> בחר תאריך התחלה לסדרה החוזרת
+                      <Repeat2 size={12} /> בחרו תאריך התחלה לסדרה החוזרת
                     </p>
                   )}
                 </>
@@ -590,7 +602,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת התחלה</label>
                   <select className="input" value={startHour ?? ''} onChange={e => { setStartHour(parseInt(e.target.value)); setEndHour(''); setBookError(''); }}>
-                    <option value="">בחר...</option>
+                    <option value="">בחרו...</option>
                     {ALL_HOURS.map(h => {
                       const occ = occupiedHours.has(h);
                       const blk = blockedHoursForDate.has(h);
@@ -604,7 +616,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שעת סיום</label>
                   <select className="input" value={endHour} disabled={startHour === null} onChange={e => { setBookError(''); setEndHour(e.target.value); }}>
-                    <option value="">בחר...</option>
+                    <option value="">בחרו...</option>
                     {startHour !== null && [...ALL_HOURS.filter(h => h > startHour), ...(startHour <= 21 ? [22] : [])].map(h => {
                       const hoursInRange = Array.from({ length: h - startHour }, (_, i) => startHour + i);
                       const isSelfOccupied = occupiedHours.has(h - 1) || blockedHoursForDate.has(h - 1);
@@ -626,7 +638,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך</label>
                   <select className="input" value={therapistId} onChange={e => setTherapistId(e.target.value)}>
-                    <option value="">בחר...</option>
+                    <option value="">בחרו...</option>
                     {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
@@ -640,7 +652,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                   <textarea
                     className={`input resize-none${isAgaf && !note.trim() ? ' border-red-300' : ''}`}
                     rows={2}
-                    placeholder={isAgaf ? 'נא פרט את מטרת השימוש...' : 'הערה אופציונלית...'}
+                    placeholder={isAgaf ? 'נא לפרט את מטרת השימוש...' : 'הערה אופציונלית...'}
                     value={note}
                     onChange={e => setNote(e.target.value)}
                     maxLength={200}
@@ -683,7 +695,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                         <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
                           <input type="radio" name="endMode" value={mode} checked={recurEndMode === mode}
                             onChange={() => setRecurEndMode(mode)} className="accent-green-500" />
-                          {mode === 'occurrences' ? 'לפי מספר מופעים' : 'לפי תאריך סיום'}
+                          {mode === 'occurrences' ? 'לפי מספר מפגשים' : 'לפי תאריך סיום'}
                         </label>
                       ))}
                     </div>
@@ -692,7 +704,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                         <input type="number" dir="ltr" min={1} max={200} value={recurOccurrences}
                           onChange={e => setRecurOccurrences(e.target.value)}
                           className="input text-center" style={{ width: '5rem' }} />
-                        <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מופעים'}</span>
+                        <span className="text-sm text-gray-500">{FREQ_OPTIONS.find(f => f.value === recurFrequency)?.unit || 'מפגשים'}</span>
                       </div>
                     ) : (
                       <input type="date" dir="ltr" value={recurEndDate} min={selectedDate}
@@ -708,7 +720,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm text-blue-700">
                           <CalendarRange size={15} className="shrink-0" />
-                          <span>סדרת הטיפולים תהיה בין <strong>{formatShort(stats.startDate)}</strong> ועד <strong>{formatShort(stats.endDate)}</strong></span>
+                          <span>סדרת הטיפולים תהיה בין <strong>{formatShort(stats.startDate)}</strong> לבין <strong>{formatShort(stats.endDate)}</strong></span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
                           <span className="w-4 h-4 bg-blue-200 rounded-full flex items-center justify-center text-xs text-blue-800 shrink-0">✓</span>
@@ -725,11 +737,11 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                 <button onClick={handleBook} disabled={!startHour || !endHour || !therapistId || booking}
                   className="btn-primary flex-1 py-2.5 px-4">
                   {booking ? 'שומר...' : isRecurring
-                    ? `שמור סדרה חוזרת${startHour && endHour ? ` ${hLabel(startHour)}–${hLabel(parseInt(endHour))}` : ''}`
-                    : `אשר שיבוץ${startHour && endHour ? ` ${hLabel(startHour)}–${hLabel(parseInt(endHour))}` : ''}`}
+                    ? `שמירת סדרה חוזרת${startHour && endHour ? ` ${hLabel(startHour)}–${hLabel(parseInt(endHour))}` : ''}`
+                    : `אישור שיבוץ${startHour && endHour ? ` ${hLabel(startHour)}–${hLabel(parseInt(endHour))}` : ''}`}
                 </button>
                 <button type="button" onClick={() => { setStep('calendar'); setStartHour(null); setEndHour(''); setBookError(''); }}
-                  className="btn-secondary px-4 py-2.5">חזור</button>
+                  className="btn-secondary px-4 py-2.5">חזרה</button>
               </div>
             </div>
           )}
@@ -771,8 +783,8 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                   <div className="flex gap-2 pt-2">
                     <button
                       onClick={() => { setScatterEntries([]); setScatterResults(null); setPendingDate(null); }}
-                      className="btn-secondary flex-1 py-2.5">הוסף עוד תאריכים</button>
-                    <button onClick={onClose} className="btn-primary flex-1 py-2.5">סיים</button>
+                      className="btn-secondary flex-1 py-2.5">הוספת תאריכים</button>
+                    <button onClick={onClose} className="btn-primary flex-1 py-2.5">סיום</button>
                   </div>
                 </div>
               ) : (
@@ -782,7 +794,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-600 mb-1.5">שם המטפל</label>
                       <select className="input" value={scatterTherapistId} onChange={e => setScatterTherapistId(e.target.value)}>
-                        <option value="">בחר...</option>
+                        <option value="">בחרו...</option>
                         {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
@@ -835,16 +847,16 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                       {pendingDate && (
                         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 fade-up">
                           <p className="text-sm font-semibold text-amber-800 mb-3">
-                            {formatDateHe(pendingDate)} — בחר שעות
+                            {formatDateHe(pendingDate)} — בחרו שעות
                           </p>
                           {occupiedHoursForPending.size > 0 || blockedHoursForPending.size > 0 ? (
-                            <p className="text-xs text-orange-600 mb-2">⚠️ חלק מהשעות תפוסות/חסומות</p>
+                            <p className="text-xs text-orange-600 mb-2">⚠️ חלק מהשעות תפוסות או חסומות</p>
                           ) : null}
                           <div className="flex gap-3 mb-3">
                             <div className="flex-1">
                               <p className="text-xs text-gray-500 mb-1.5">שעת התחלה:</p>
                               <select className="input text-sm" value={scatterStart ?? ''} onChange={e => { setScatterStart(parseInt(e.target.value)); setScatterEnd(''); }}>
-                                <option value="">בחר...</option>
+                                <option value="">בחרו...</option>
                                 {ALL_HOURS.map(h => {
                                   const occ = occupiedHoursForPending.has(h);
                                   const blk = blockedHoursForPending.has(h);
@@ -856,7 +868,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                               <p className="text-xs text-gray-500 mb-1.5">שעת סיום:</p>
                               <select className="input text-sm" value={scatterEnd} disabled={scatterStart === null}
                                 onChange={e => { setBookError(''); setScatterEnd(e.target.value); }}>
-                                <option value="">בחר...</option>
+                                <option value="">בחרו...</option>
                                 {scatterStart !== null && [...ALL_HOURS.filter(h => h > scatterStart), ...(scatterStart <= 21 ? [22] : [])].map(h => {
                                   const hoursInRange = Array.from({ length: h - scatterStart }, (_, i) => scatterStart + i);
                                   const isSelfOccupied = occupiedHoursForPending.has(h - 1) || blockedHoursForPending.has(h - 1);
@@ -877,7 +889,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                             <button onClick={confirmScatterEntry}
                               disabled={!scatterStart || !scatterEnd}
                               className="btn-primary flex-1 py-2 text-sm disabled:opacity-40">
-                              הוסף לרשימה
+                              הוספה לרשימה
                             </button>
                             <button onClick={() => { setPendingDate(null); setScatterStart(null); setScatterEnd(''); }}
                               className="btn-secondary px-3 py-2 text-sm">ביטול</button>
@@ -899,7 +911,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                       </h3>
                       {scatterEntries.length === 0 ? (
                         <p className="text-gray-400 text-sm text-center py-6 flex-1 flex items-center justify-center">
-                          לחץ על יום בלוח להוספה
+                          לחצו על יום בלוח להוספה
                         </p>
                       ) : (
                         <div className="space-y-2 overflow-y-auto flex-1" style={{ maxHeight: '280px' }}>
@@ -909,7 +921,7 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
                               <div key={e.id} className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-700 truncate">{formatDateHe(e.date)}</p>
-                                  <p className="text-xs text-purple-600">{hLabel(e.startHour)} – {hLabel(e.endHour)}</p>
+                                  <p className="text-xs text-purple-600">{hLabel(e.startHour)}–{hLabel(e.endHour)}</p>
                                 </div>
                                 <button
                                   onClick={() => setScatterEntries(prev => prev.filter(x => x.id !== e.id))}
@@ -940,8 +952,8 @@ export default function AddBookingModal({ room, therapists, onClose, onSuccess }
               {scatterSaving
                 ? 'שומר...'
                 : scatterEntries.length === 0
-                  ? 'שמור הכל'
-                  : `שמור הכל (${scatterEntries.length} שיבוצים)`}
+                  ? 'שמירת הכול'
+                  : `שמירת הכול (${scatterEntries.length} שיבוצים)`}
             </button>
           </div>
         )}

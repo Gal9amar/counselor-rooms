@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import RouteError from '../components/RouteError';
 import {
   CalendarDays, Repeat2, CalendarRange, ChevronLeft, ChevronRight,
   CheckCircle, X, AlertTriangle, Info,
@@ -22,7 +23,7 @@ function toDateStr(d) {
 function hLabel(h) { return `${h}:00`; }
 function formatDateHe(ds) {
   const d = new Date(ds + 'T00:00:00');
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
+  return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
 }
 function formatShort(ds) {
   const d = new Date(ds + 'T00:00:00');
@@ -173,8 +174,8 @@ const BOOKING_TYPES = [
     subtitle: 'תאריך אחד, שעות קבועות',
     bullets: ['בוחרים תאריך ספציפי', 'קובעים שעת התחלה וסיום', 'מתאים לפגישה חד-פעמית'],
     example: 'לדוגמה: פגישת הערכה ב-5 ביוני, 14:00–15:00',
-    steps: ['בחר שמך וחדר', 'לחץ על תאריך בלוח', 'קבע שעת התחלה וסיום ושלח'],
-    formHint: 'בחר תאריך ספציפי בלוח ולאחר מכן קבע את שעות השיבוץ',
+    steps: ['בחרו שם וחדר', 'לחצו על תאריך בלוח', 'קבעו שעת התחלה וסיום ושלחו'],
+    formHint: 'בחרו תאריך ספציפי בלוח ולאחר מכן קבעו את שעות השיבוץ',
   },
   {
     id: 'recurring',
@@ -191,10 +192,10 @@ const BOOKING_TYPES = [
     badgeText: 'text-blue-700',
     title: 'שיבוץ חוזר',
     subtitle: 'יומי, שבועי או חודשי',
-    bullets: ['קובעים תדירות חזרה', 'הגדרת ימים בשבוע (לשבועי)', 'מתאים לטיפולים קבועים'],
+    bullets: ['קובעים תדירות חזרה', 'מגדירים ימים בשבוע (לשבועי)', 'מתאים לטיפולים קבועים'],
     example: 'לדוגמה: כל יום שלישי ורביעי 10:00–11:00 לשלושה חודשים',
-    steps: ['בחר שמך וחדר', 'בחר תאריך התחלה ושעות', 'הגדר תדירות ותאריך סיום'],
-    formHint: 'בחר תאריך התחלה ושעות, ואז הגדר את תדירות וסיום הסדרה',
+    steps: ['בחרו שם וחדר', 'בחרו תאריך התחלה ושעות', 'הגדירו תדירות ותאריך סיום'],
+    formHint: 'בחרו תאריך התחלה ושעות, ואז הגדירו את תדירות הסדרה ואת סיומה',
   },
   {
     id: 'scatter',
@@ -213,8 +214,8 @@ const BOOKING_TYPES = [
     subtitle: 'ימים נבחרים, שעות שונות',
     bullets: ['בוחרים מספר תאריכים לא רצופים', 'שעות שונות לכל תאריך', 'מתאים ללוח זמנים גמיש'],
     example: 'לדוגמה: 3/6 ב-09:00, 7/6 ב-14:00, 15/6 ב-11:00',
-    steps: ['בחר שמך וחדר', 'לחץ על ימים בלוח ובחר שעות לכל יום', 'הוסף הערה ושלח'],
-    formHint: 'לחץ על כל יום בלוח, הגדר שעות, ואז עבור ליום הבא — ניתן לבחור כמה ימים שרוצים',
+    steps: ['בחרו שם וחדר', 'לחצו על ימים בלוח ובחרו שעות לכל יום', 'הוסיפו הערה ושלחו'],
+    formHint: 'לחצו על כל יום בלוח, הגדירו שעות ועברו ליום הבא. אפשר לבחור ככל שתרצו',
   },
 ];
 
@@ -232,6 +233,7 @@ export default function NewBookingPage() {
   const [bookingType, setBookingType] = useState(null); // 'single'|'recurring'|'scatter'
   const [error, setError]         = useState('');
   const [saving, setSaving]       = useState(false);
+  const [wasQueued, setWasQueued]  = useState(false);
 
   // Calendar / schedule data
   const [allSlots, setAllSlots]         = useState([]);
@@ -263,10 +265,13 @@ export default function NewBookingPage() {
   const [scatterMonth, setScatterMonth]     = useState(today.getMonth());
 
   // Load rooms + therapists once
-  useEffect(() => {
-    getRoomsSilent().then(setRooms).catch(() => {});
-    getTherapistsSilent().then(setTherapists).catch(() => {});
+  const [loadError, setLoadError] = useState(null);
+  const loadBase = useCallback(() => {
+    setLoadError(null);
+    getRoomsSilent().then(setRooms).catch(setLoadError);
+    getTherapistsSilent().then(setTherapists).catch(setLoadError);
   }, []);
+  useEffect(() => { loadBase(); }, [loadBase]);
 
   // Load schedule data when room selected
   useEffect(() => {
@@ -389,7 +394,7 @@ export default function NewBookingPage() {
     if (!scatterStart || !end || end <= scatterStart) return;
     const conflict = Array.from({ length: end - scatterStart }, (_, i) => scatterStart + i)
       .some(x => occupiedHoursForPending.has(x) || blockedHoursForPending.has(x));
-    if (conflict) { setError('הטווח שנבחר חופף שיבוץ קיים בחדר'); return; }
+    if (conflict) { setError('הטווח שנבחר חופף לשיבוץ קיים בחדר'); return; }
     setError('');
     setScatterEntries(prev => [...prev, { id: crypto.randomUUID(), date: pendingDate, startHour: scatterStart, endHour: end }]);
     setPendingDate(null); setScatterStart(null); setScatterEnd('');
@@ -409,16 +414,16 @@ export default function NewBookingPage() {
       if (!endHour)       { setError('נא לבחור שעת סיום'); return; }
       const end = parseInt(endHour);
       if (daySlots.some(s => startHour < s.endHour && end > s.startHour)) {
-        setError('קיים שיבוץ חופף בחדר זה בשעות אלו'); return;
+        setError('קיים שיבוץ חופף בחדר זה בשעות אלה'); return;
       }
       if (bookingType === 'recurring') {
         if (recurFrequency === 'weekly' && recurDays.length === 0) { setError('יש לבחור לפחות יום אחד'); return; }
-        if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setError('יש להזין מספר מופעים'); return; }
+        if (recurEndMode === 'occurrences' && (!recurOccurrences || recurOccurrences < 1)) { setError('יש להזין מספר מפגשים'); return; }
         if (recurEndMode === 'date' && !recurEndDate) { setError('יש לבחור תאריך סיום'); return; }
       }
       setSaving(true);
       try {
-        await createBookingRequest({
+        const created = await createBookingRequest({
           therapistName: therapistName,
           roomId: parseInt(roomId),
           date: selectedDate,
@@ -434,17 +439,19 @@ export default function NewBookingPage() {
             recurEndDate:     recurEndMode === 'date' ? recurEndDate : null,
           } : {}),
         });
+        setWasQueued(created?.status === 'queued');
         setStep('success');
       } catch (e) {
-        setError(e.response?.data?.error || 'שגיאה בשליחת הבקשה');
+        setError(e.response?.data?.error || 'לא הצלחנו לשלוח את הבקשה. נסו שוב.');
       } finally { setSaving(false); }
 
     } else if (bookingType === 'scatter') {
       if (scatterEntries.length === 0) { setError('יש לבחור לפחות תאריך אחד'); return; }
       setSaving(true);
       try {
+        let anyQueued = false;
         for (const [idx, entry] of scatterEntries.entries()) {
-          await createBookingRequest({
+          const created = await createBookingRequest({
             therapistName: therapistName,
             roomId: parseInt(roomId),
             date: entry.date,
@@ -455,16 +462,19 @@ export default function NewBookingPage() {
             // the last request carries the whole list so the owner gets a single summary email
             ...(idx === scatterEntries.length - 1 ? { scatterAll: scatterEntries.map(({ date, startHour, endHour }) => ({ date, startHour, endHour })) } : {}),
           });
+          if (created?.status === 'queued') anyQueued = true;
         }
+        setWasQueued(anyQueued);
         setStep('success');
       } catch (e) {
-        setError(e.response?.data?.error || 'שגיאה בשליחת הבקשה');
+        setError(e.response?.data?.error || 'לא הצלחנו לשלוח את הבקשה. נסו שוב.');
       } finally { setSaving(false); }
     }
   };
 
   const handleBackToTypes = () => {
     setStep('type');
+    setWasQueued(false);
     setBookingType(null);
     resetForm();
     setRoomId('');
@@ -485,6 +495,20 @@ export default function NewBookingPage() {
     : 1;
 
   // ── render ──
+  if (loadError && (rooms.length === 0 || therapists.length === 0)) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-100 shadow-sm">
+          <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <img src="/logo-right.png" alt="מרכז אופק" className="h-8 w-auto object-contain" />
+            <span className="text-sm font-semibold text-gray-600">בקשת שיבוץ חדר</span>
+            <img src="/logo-left.png" alt="חוף אשקלון" className="h-8 w-auto object-contain" />
+          </div>
+        </div>
+        <RouteError error={loadError} onRetry={loadBase} compact={false} />
+      </div>
+    );
+  }
   return (
     <div className="nb-root min-h-screen bg-gray-50" dir="rtl">
       {/* Top bar */}
@@ -505,10 +529,14 @@ export default function NewBookingPage() {
               <CheckCircle size={44} className="text-green-500" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">הבקשה נשלחה!</h2>
-            <p className="text-gray-500 mb-1">הבקשה שלך התקבלה בהצלחה</p>
-            <p className="text-gray-500 text-sm mb-8">המנהל יבדוק את הבקשה ויאשר את השיבוץ בהקדם</p>
+            {wasQueued ? (
+              <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto">הבקשה התקבלה ונמצאת בתור. היא תועבר לטיפול המנהל ככל שיתפנה מקום, ואין צורך לשלוח אותה שוב.</p>
+            ) : (<>
+              <p className="text-gray-500 mb-1">הבקשה שלך התקבלה בהצלחה</p>
+              <p className="text-gray-500 text-sm mb-8">המנהל יבדוק את הבקשה ויאשר את השיבוץ בהקדם</p>
+            </>)}
             <button onClick={handleBackToTypes} className="btn-primary px-8 py-3 text-base">
-              שלח בקשה נוספת
+              שליחת בקשה נוספת
             </button>
           </div>
         )}
@@ -517,8 +545,8 @@ export default function NewBookingPage() {
         {step === 'type' && (
           <div className="fade-up">
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">בחר סוג שיבוץ</h1>
-              <p className="text-gray-500 text-sm">בחר את סוג השיבוץ המתאים לצרכיך</p>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">בחרו סוג שיבוץ</h1>
+              <p className="text-gray-500 text-sm">בחרו את סוג השיבוץ המתאים לצרכים שלכם</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {BOOKING_TYPES.map(type => {
@@ -621,13 +649,13 @@ export default function NewBookingPage() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
-                <span className="text-sm font-semibold text-gray-700">פרטי המבקש והחדר</span>
+                <span className="text-sm font-semibold text-gray-700">פרטי הבקשה והחדר</span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">שמך <span className="text-red-400">*</span></label>
                 <select value={therapistId} onChange={e => setTherapistId(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
-                  <option value="">בחר שם...</option>
+                  <option value="">בחרו שם...</option>
                   {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
@@ -635,7 +663,7 @@ export default function NewBookingPage() {
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">חדר מבוקש <span className="text-red-400">*</span></label>
                 <select value={roomId} onChange={e => setRoomId(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
-                  <option value="">בחר חדר...</option>
+                  <option value="">בחרו חדר...</option>
                   {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
@@ -650,7 +678,7 @@ export default function NewBookingPage() {
                     <div className="flex items-center gap-2 mb-3">
                       <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
                       <label className="text-sm font-semibold text-gray-700">
-                        {bookingType === 'recurring' ? 'תאריך התחלה לסדרה' : 'בחר תאריך'} <span className="text-red-400">*</span>
+                        {bookingType === 'recurring' ? 'תאריך התחלה לסדרה' : 'בחרו תאריך'} <span className="text-red-400">*</span>
                       </label>
                     </div>
                     {!roomId ? (
@@ -678,7 +706,7 @@ export default function NewBookingPage() {
                         <CalendarLegend />
                         {bookingType === 'recurring' && (
                           <p className="text-xs text-blue-600 text-center mt-3 flex items-center justify-center gap-1">
-                            <Repeat2 size={12}/> בחר את התאריך שממנו תתחיל הסדרה החוזרת
+                            <Repeat2 size={12}/> בחרו את התאריך שבו תתחיל הסדרה החוזרת
                           </p>
                         )}
                       </>
@@ -700,13 +728,13 @@ export default function NewBookingPage() {
                       </div>
                       <button onClick={() => { setCalStep('calendar'); setStartHour(null); setEndHour(''); setError(''); }}
                         className="text-xs text-gray-500 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-                        שנה תאריך
+                        שינוי תאריך
                       </button>
                     </div>
 
                     {blockedHoursForDate.size > 0 && (
                       <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-700">
-                        <span>🚫</span><span>חלק מהשעות חסומות בתאריך זה — שעות אלו יופיעו כמושבתות ברשימה</span>
+                        <span>🚫</span><span>חלק מהשעות חסומות בתאריך זה — שעות אלה יופיעו כמושבתות ברשימה</span>
                       </div>
                     )}
 
@@ -722,7 +750,7 @@ export default function NewBookingPage() {
                           <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת התחלה <span className="text-red-400">*</span></label>
                           <select value={startHour ?? ''} onChange={e => { setStartHour(parseInt(e.target.value)); setEndHour(''); setError(''); }}
                             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white">
-                            <option value="">בחר...</option>
+                            <option value="">בחרו...</option>
                             {ALL_HOURS.map(h => {
                               const occ = occupiedHours.has(h), blk = blockedHoursForDate.has(h);
                               const occupant = daySlots.find(s => h >= s.startHour && h < s.endHour);
@@ -737,7 +765,7 @@ export default function NewBookingPage() {
                           <select value={endHour} disabled={startHour === null}
                             onChange={e => { setEndHour(e.target.value); setError(''); }}
                             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 bg-white disabled:opacity-40">
-                            <option value="">בחר...</option>
+                            <option value="">בחרו...</option>
                             {startHour !== null && [...ALL_HOURS.filter(h => h > startHour), ...(startHour <= 21 ? [22] : [])].map(h => {
                               const hoursInRange = Array.from({ length: h - startHour }, (_, i) => startHour + i);
                               const isSelfOcc    = occupiedHours.has(h-1) || blockedHoursForDate.has(h-1);
@@ -789,7 +817,7 @@ export default function NewBookingPage() {
                         {recurFrequency === 'weekly' && (
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1">ימים בשבוע <span className="text-red-400">*</span></label>
-                            <p className="text-xs text-gray-500 mb-2">בחר אחד או יותר מהימים שבהם יחזור השיבוץ</p>
+                            <p className="text-xs text-gray-500 mb-2">בחרו יום אחד או יותר שבהם יחזור השיבוץ</p>
                             <div className="flex gap-2">
                               {[0,1,2,3,4,5].map(day => (
                                 <button key={day} type="button"
@@ -805,14 +833,14 @@ export default function NewBookingPage() {
                         {/* סיום */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-1">מתי מסתיימת הסדרה?</label>
-                          <p className="text-xs text-gray-500 mb-2">ניתן לקבוע לפי מספר פגישות או לפי תאריך אחרון</p>
+                          <p className="text-xs text-gray-500 mb-2">ניתן לקבוע לפי מספר מפגשים או לפי תאריך אחרון</p>
                           <div className="flex gap-3 mb-3">
                             {['occurrences','date'].map(mode => (
                               <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
                                 <input type="radio" name="endMode" value={mode}
                                   checked={recurEndMode === mode} onChange={() => setRecurEndMode(mode)}
                                   className="accent-blue-500" />
-                                {mode === 'occurrences' ? 'לפי מספר מופעים' : 'לפי תאריך סיום'}
+                                {mode === 'occurrences' ? 'לפי מספר מפגשים' : 'לפי תאריך סיום'}
                               </label>
                             ))}
                           </div>
@@ -869,7 +897,7 @@ export default function NewBookingPage() {
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
-                    <span className="text-sm font-semibold text-gray-700">בחר ימים ושעות</span>
+                    <span className="text-sm font-semibold text-gray-700">בחרו ימים ושעות</span>
                   </div>
                   {!roomId ? (
                     <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
@@ -880,7 +908,7 @@ export default function NewBookingPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       {/* לוח */}
                       <div>
-                        <p className="text-xs text-gray-500 mb-2">לחץ על יום להוספה — לחיצה שנייה מסירה אותו</p>
+                        <p className="text-xs text-gray-500 mb-2">לחצו על יום להוספה. לחיצה שנייה מסירה אותו</p>
                         <div className="flex items-center justify-between mb-3">
                           <button onClick={nextScatMonth} className="p-1.5 rounded-lg hover:bg-gray-100">
                             <ChevronRight size={18} className="text-gray-500" />
@@ -905,16 +933,16 @@ export default function NewBookingPage() {
                         {pendingDate && (
                           <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
                             <p className="text-sm font-semibold text-amber-800 mb-1">{formatDateHe(pendingDate)}</p>
-                            <p className="text-xs text-amber-700 mb-3">בחר שעות לתאריך זה ואז לחץ "הוסף לרשימה"</p>
+                            <p className="text-xs text-amber-700 mb-3">בחרו שעות לתאריך זה ולאחר מכן לחצו "הוספה לרשימה"</p>
                             {(occupiedHoursForPending.size > 0 || blockedHoursForPending.size > 0) && (
-                              <p className="text-xs text-orange-700 mb-2">⚠️ חלק מהשעות תפוסות/חסומות ולא ניתנות לבחירה</p>
+                              <p className="text-xs text-orange-700 mb-2">⚠️ חלק מהשעות תפוסות או חסומות ולא ניתנות לבחירה</p>
                             )}
                             <div className="grid grid-cols-2 gap-2 mb-3">
                               <div>
                                 <p className="text-xs text-gray-500 mb-1">שעת התחלה</p>
                                 <select value={scatterStart ?? ''} onChange={e => { setScatterStart(parseInt(e.target.value)); setScatterEnd(''); }}
                                   className="w-full border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
-                                  <option value="">בחר...</option>
+                                  <option value="">בחרו...</option>
                                   {ALL_HOURS.map(h => {
                                     const occ = occupiedHoursForPending.has(h), blk = blockedHoursForPending.has(h);
                                     return <option key={h} value={h} disabled={occ||blk}>{hLabel(h)}{blk?' 🚫':occ?' (תפוס)':''}</option>;
@@ -926,7 +954,7 @@ export default function NewBookingPage() {
                                 <select value={scatterEnd} disabled={scatterStart === null}
                                   onChange={e => { setError(''); setScatterEnd(e.target.value); }}
                                   className="w-full border border-gray-200 rounded-xl px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-40">
-                                  <option value="">בחר...</option>
+                                  <option value="">בחרו...</option>
                                   {scatterStart !== null && [...ALL_HOURS.filter(h => h > scatterStart), ...(scatterStart <= 21 ? [22] : [])].map(h => {
                                     const range    = Array.from({ length: h - scatterStart }, (_, i) => scatterStart + i);
                                     const selfOcc  = occupiedHoursForPending.has(h-1) || blockedHoursForPending.has(h-1);
@@ -940,7 +968,7 @@ export default function NewBookingPage() {
                             </div>
                             <div className="flex gap-2">
                               <button onClick={confirmScatterEntry} disabled={!scatterStart || !scatterEnd}
-                                className="btn-primary flex-1 py-2 text-sm disabled:opacity-40">הוסף לרשימה</button>
+                                className="btn-primary flex-1 py-2 text-sm disabled:opacity-40">הוספה לרשימה</button>
                               <button onClick={() => { setPendingDate(null); setScatterStart(null); setScatterEnd(''); }}
                                 className="btn-secondary px-3 py-2 text-sm">ביטול</button>
                             </div>
@@ -961,7 +989,7 @@ export default function NewBookingPage() {
                         {scatterEntries.length === 0 ? (
                           <div className="text-gray-500 text-sm text-center py-8 flex-1 flex flex-col items-center justify-center gap-2 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                             <CalendarRange size={24} className="text-gray-300" />
-                            <span>לחץ על יום בלוח להוספה</span>
+                            <span>לחצו על יום בלוח להוספה</span>
                           </div>
                         ) : (
                           <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -969,7 +997,7 @@ export default function NewBookingPage() {
                               <div key={e.id} className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-700 truncate">{formatDateHe(e.date)}</p>
-                                  <p className="text-xs text-purple-600">{hLabel(e.startHour)} – {hLabel(e.endHour)}</p>
+                                  <p className="text-xs text-purple-600">{hLabel(e.startHour)}–{hLabel(e.endHour)}</p>
                                 </div>
                                 <button onClick={() => setScatterEntries(prev => prev.filter(x => x.id !== e.id))}
                                   className="text-gray-300 hover:text-red-400 transition-colors p-1">
@@ -998,8 +1026,8 @@ export default function NewBookingPage() {
               <button onClick={handleSubmit} disabled={saving}
                 className="btn-primary w-full py-3 text-base mt-4">
                 {saving ? 'שולח בקשה...' : bookingType === 'scatter'
-                  ? `שלח בקשה (${scatterEntries.length} שיבוצים)`
-                  : 'שלח בקשת שיבוץ'}
+                  ? `שליחת בקשה (${scatterEntries.length} שיבוצים)`
+                  : 'שליחת בקשת שיבוץ'}
               </button>
             )}
           </div>

@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { getRooms, getSchedule, getRoomNotes, getTherapists, getScheduleSilent, getRoomsSilent, getTherapistsSilent, getRoomNotesSilentAll } from '../services/api';
+import { getSchedule, getBootstrap, getScheduleSilent } from '../services/api';
 import { RefreshCw, User, Clock, CalendarDays, LayoutGrid, List, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import AddBookingModal from '../components/AddBookingModal';
+import RouteError from '../components/RouteError';
+import useAdmin from '../hooks/useAdmin';
+import { ADMIN_ONLY_MESSAGE } from '../services/adminAuth';
 
 const HOURS=[8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 const DAYS_HE=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -30,16 +33,16 @@ function formatNextDate(dateStr){
   const d=new Date(dateStr+'T00:00:00');
   const diff=Math.round((d-new Date(today+'T00:00:00'))/(1000*60*60*24));
   if(diff===1) return 'מחר';
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]}`;
+  return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]}`;
 }
 function formatDateHe(dateStr){
   const d=new Date(dateStr+'T00:00:00');
-  return `${DAYS_HE[d.getDay()]} ${d.getDate()} ${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
+  return `יום ${DAYS_HE[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]} ${d.getFullYear()}`;
 }
 function hLabel(h){return `${h}:00`;}
 function getNow(){const n=new Date();return{dateStr:toDateStr(n),hour:n.getHours(),minute:n.getMinutes()};}
 
-function RoomModal({room,onClose,onAddSlot}){
+function RoomModal({room,onClose,onAddSlot,canAdd,memSlots=[],isRangeLoaded}){
   const handleAddSlot=()=>{onClose();onAddSlot(room);};
   const today=new Date();today.setHours(0,0,0,0);
   const [year,setYear]=useState(today.getFullYear());
@@ -47,14 +50,18 @@ function RoomModal({room,onClose,onAddSlot}){
   const [slots,setSlots]=useState([]);
   const [loading,setLoading]=useState(true);
   const [selectedDate,setSelectedDate]=useState(null); // clicked day
+  const memRef=useRef(memSlots);memRef.current=memSlots;
 
   const load=useCallback(async(y,m)=>{
     setLoading(true);
     const from=`${y}-${String(m+1).padStart(2,'0')}-01`;
     const lastDay=new Date(y,m+1,0).getDate();
     const to=`${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    // Reuse the dashboard's in-memory slots when the month is inside the loaded range
+    if(isRangeLoaded&&isRangeLoaded(from,to)){setSlots(memRef.current.filter(s=>s.roomId===room.id&&toDateStr(new Date(s.date))>=from&&toDateStr(new Date(s.date))<=to));setLoading(false);return;}
     try{const s=await getSchedule({roomId:room.id,from,to});setSlots(s);}
     finally{setLoading(false);}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[room.id]);
 
   useEffect(()=>{load(year,month);setSelectedDate(null);},[year,month,load]);
@@ -82,14 +89,14 @@ function RoomModal({room,onClose,onAddSlot}){
           <div>
             <h2 className="text-lg font-bold text-gray-800">{room.name}</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              {selectedDate ? formatDateHe(selectedDate) : 'לחץ על יום לפרטים'}
+              {selectedDate ? formatDateHe(selectedDate) : 'לחצו על יום לפרטים'}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleAddSlot}
+            {canAdd&&<button onClick={handleAddSlot}
               className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
-              <Plus size={14}/> הוסף שיבוץ
-            </button>
+              <Plus size={14}/> הוספת שיבוץ
+            </button>}
             <button onClick={onClose} className="btn-ghost p-1.5"><X size={20}/></button>
           </div>
         </div>
@@ -164,7 +171,7 @@ function RoomModal({room,onClose,onAddSlot}){
                               <span className="text-sm font-semibold text-gray-800">{s.therapist.name}</span>
                             </div>
                             <span className="text-sm font-medium text-green-700">
-                              {hLabel(s.startHour)} – {hLabel(s.endHour)}
+                              {hLabel(s.startHour)}–{hLabel(s.endHour)}
                             </span>
                           </div>
                           {s.note&&<p className="text-xs text-gray-400 italic mt-1.5 pr-5">{s.note}</p>}
@@ -180,7 +187,7 @@ function RoomModal({room,onClose,onAddSlot}){
                 <div className="text-center text-gray-400 text-xs py-2">
                   {Object.keys(slotsByDate).length===0
                     ?'אין שיבוצים בחודש זה'
-                    :`${Object.keys(slotsByDate).length} ימים עם שיבוצים — לחץ על יום לפרטים`}
+                    :`${Object.keys(slotsByDate).length} ימים עם שיבוצים — לחצו על יום לפרטים`}
                 </div>
               )}
             </>
@@ -264,7 +271,7 @@ const RoomCard=React.memo(function RoomCard({room,slots,notes,onClick,index}){
         {active&&(
           <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2.5 space-y-1.5">
             <div className="flex items-center gap-2 text-gray-800"><User size={14} className="text-red-400 shrink-0"/><span className="font-semibold">{active.therapist.name}</span></div>
-            <div className="flex items-center gap-2 text-red-600 text-sm font-medium"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)} – {hLabel(active.endHour)}</span></div>
+            <div className="flex items-center gap-2 text-red-600 text-sm font-medium"><Clock size={12} className="shrink-0"/><span>{hLabel(active.startHour)}–{hLabel(active.endHour)}</span></div>
             {active.note && <p className="text-xs text-gray-400 italic">{active.note}</p>}
           </div>
         )}
@@ -317,7 +324,7 @@ const RoomCard=React.memo(function RoomCard({room,slots,notes,onClick,index}){
             })}
           </div>
         )}
-        <p className="text-xs text-gray-400 mt-auto pt-3 border-t border-gray-100">לחץ לצפייה בלוח החודשי ←</p>
+        <p className="text-xs text-gray-400 mt-auto pt-3 border-t border-gray-100">לחצו לצפייה בלוח החודשי ←</p>
       </div>
     </button>
   );
@@ -382,7 +389,7 @@ function TimelineView({rooms,slots,onEnsureRange,therapistColorMap={}}){
             style={{bottom:'calc(100% + 8px)'}} dir="rtl">
             <div className={`text-xs font-bold px-2 py-1 rounded-lg mb-3 ${col.header} ${col.label}`}>{s.room?.name}</div>
             <p className="font-bold text-gray-900 mb-2">{s.therapist.name}</p>
-            <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00 – {s.endHour}:00</p>
+            <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00–{s.endHour}:00</p>
             <p className="text-xs text-gray-400 mb-1">משך: {s.endHour-s.startHour} שעות</p>
             {s.note&&<p className="text-xs text-gray-600 italic border-t border-gray-100 pt-2 mt-2">📝 {s.note}</p>}
           </div>
@@ -409,7 +416,7 @@ function TimelineView({rooms,slots,onEnsureRange,therapistColorMap={}}){
             <span className="font-bold text-gray-800 text-sm whitespace-nowrap px-1">
               {viewMode==='week'
                 ?`${addDays(weekStart,0).getDate()}/${addDays(weekStart,0).getMonth()+1} – ${addDays(weekStart,6).getDate()}/${addDays(weekStart,6).getMonth()+1}`
-                :`${DAYS_HE[viewDate.getDay()]} ${viewDate.getDate()} ${MONTHS_HE[viewDate.getMonth()]}`}
+                :`יום ${DAYS_HE[viewDate.getDay()]}, ${viewDate.getDate()} ב${MONTHS_HE[viewDate.getMonth()]}`}
             </span>
             <button onClick={nextNav} className="btn-ghost p-1.5"><ChevronLeft size={18}/></button>
           </div>
@@ -522,7 +529,7 @@ function TimelineView({rooms,slots,onEnsureRange,therapistColorMap={}}){
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-green-500 inline-block"/> פעיל עכשיו</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-200 inline-block"/> עבר</span>
         <span className="flex items-center gap-1.5"><span className="w-0.5 h-4 bg-red-400 inline-block"/> קו עכשיו</span>
-        <span className="flex items-center gap-1.5 mr-auto font-medium text-green-600">👆 לחץ על שיבוץ לפרטים</span>
+        <span className="flex items-center gap-1.5 mr-auto font-medium text-green-600">👆 לחצו על שיבוץ לפרטים</span>
       </div>
     </div>
   );
@@ -634,7 +641,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange,therapistColorMap={}}){
                             style={{bottom:'calc(100% + 8px)'}} dir="rtl">
                             <div className={`text-xs font-bold px-2 py-1 rounded-lg mb-3 ${col.header} ${col.label}`}>{room.name}</div>
                             <p className="font-bold text-gray-900 mb-2">{s.therapist.name}</p>
-                            <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00 – {s.endHour}:00</p>
+                            <p className="text-sm text-green-700 font-semibold mb-1">⏰ {s.startHour}:00–{s.endHour}:00</p>
                             <p className="text-xs text-gray-400 mb-1">משך: {s.endHour-s.startHour} שעות</p>
                             {s.note&&<p className="text-xs text-gray-600 italic border-t border-gray-100 pt-2 mt-2">📝 {s.note}</p>}
                           </div>
@@ -656,7 +663,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange,therapistColorMap={}}){
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-green-500 inline-block"/> פעיל עכשיו</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-200 inline-block"/> עבר</span>
           {isToday&&<span className="flex items-center gap-1.5"><span className="w-0.5 h-4 bg-red-400 inline-block"/> קו עכשיו</span>}
-          <span className="flex items-center gap-1.5 mr-auto font-medium text-green-600">👆 לחץ על שיבוץ לפרטים</span>
+          <span className="flex items-center gap-1.5 mr-auto font-medium text-green-600">👆 לחצו על שיבוץ לפרטים</span>
         </div>
       </div>
     );
@@ -718,7 +725,7 @@ function WeeklyCalendarView({rooms,slots,onEnsureRange,therapistColorMap={}}){
         </div>
       </div>
       <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 rounded-b-2xl text-center text-xs text-gray-400">
-        לחץ על יום לציר הזמן היומי
+        לחצו על יום לציר הזמן היומי
       </div>
     </div>
   );
@@ -730,10 +737,12 @@ export default function DashboardPage(){
   const [roomNotes,setRoomNotes]=useState([]);
   const [therapists,setTherapists]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [loadError,setLoadError]=useState(null);
   const [lastUpdated,setLastUpdated]=useState(null);
   const [view,setView]=useState('grid');
   const [modalRoom,setModalRoom]=useState(null);
   const [addBookingRoom,setAddBookingRoom]=useState(null);
+  const {isAdmin,denied,clearDenied}=useAdmin();
   const loadedFromRef=useRef('');
   const loadedToRef=useRef('');
 
@@ -742,16 +751,18 @@ export default function DashboardPage(){
       const today=new Date();
       const past=new Date(today);past.setDate(today.getDate()-7);
       const future=new Date(today);future.setDate(today.getDate()+30);
-      const fromStr=toDateStr(past);const toStr=toDateStr(future);
-      const fetchRooms=silent?getRoomsSilent:getRooms;
-      const fetchSchedule=silent?getScheduleSilent:getSchedule;
-      const fetchNotes=silent?getRoomNotesSilentAll:getRoomNotes;
-      const fetchTherapists=silent?getTherapistsSilent:getTherapists;
-      const [r,s,n,t]=await Promise.all([fetchRooms(),fetchSchedule({from:fromStr,to:toStr}),fetchNotes(),fetchTherapists()]);
+      // also cover the whole current month so the room modal opens from memory
+      const monthStart=toDateStr(new Date(today.getFullYear(),today.getMonth(),1));
+      const monthEnd=toDateStr(new Date(today.getFullYear(),today.getMonth()+1,0));
+      const fromStr=toDateStr(past)<monthStart?toDateStr(past):monthStart;
+      const toStr=toDateStr(future)>monthEnd?toDateStr(future):monthEnd;
+      const {rooms:r,slots:s,roomNotes:n,therapists:t}=await getBootstrap({from:fromStr,to:toStr});
       setRooms(r);setSlots(s);setRoomNotes(n);setTherapists(t);setLastUpdated(new Date());
       loadedFromRef.current=fromStr;loadedToRef.current=toStr;
-    }catch(e){if(e?.code!=='ERR_CANCELED'&&e?.name!=='AbortError')console.error(e);}finally{setLoading(false);}
+      setLoadError(null);
+    }catch(e){if(e?.code!=='ERR_CANCELED'&&e?.name!=='AbortError'){console.error(e?.message);if(!silent)setLoadError(e);}}finally{setLoading(false);}
   };
+  const retryLoad=()=>{setLoadError(null);setLoading(true);fetchData(false);};
 
   const ensureRangeLoaded=useCallback(async(from,to)=>{
     if(loadedFromRef.current&&from>=loadedFromRef.current&&to<=loadedToRef.current)return;
@@ -760,13 +771,24 @@ export default function DashboardPage(){
       setSlots(prev=>{const ids=new Set(prev.map(x=>x.id));return[...prev,...s.filter(x=>!ids.has(x.id))];});
       if(!loadedFromRef.current||from<loadedFromRef.current)loadedFromRef.current=from;
       if(!loadedToRef.current||to>loadedToRef.current)loadedToRef.current=to;
-    }catch(e){console.error(e);}
+    }catch(e){console.error(e?.message);}
+  },[]);
+
+  const isRangeLoaded=useCallback((from,to)=>!!loadedFromRef.current&&from>=loadedFromRef.current&&to<=loadedToRef.current,[]);
+
+  // Background poll: slots only (rooms/therapists/notes rarely change), over the whole loaded range; keeps content on failure
+  const refreshSlots=useCallback(async()=>{
+    if(!loadedFromRef.current)return;
+    try{
+      const s=await getScheduleSilent({from:loadedFromRef.current,to:loadedToRef.current});
+      setSlots(s);setLastUpdated(new Date());
+    }catch(e){console.error(e?.message);}
   },[]);
 
   useEffect(()=>{
     const controller=new AbortController();
     fetchData(false,controller.signal);
-    const i=setInterval(()=>fetchData(true,controller.signal),60000);
+    const i=setInterval(()=>{if(!document.hidden)refreshSlots();},60000);
     return()=>{controller.abort();clearInterval(i);};
   },[]);
 
@@ -787,13 +809,15 @@ export default function DashboardPage(){
   const activeCount=new Set(slots.filter(s=>toDateStr(new Date(s.date))===dateStr&&nowDecimal>=s.startHour&&nowDecimal<s.endHour).map(s=>s.roomId)).size;
   const now=new Date();
 
+  if(loadError&&rooms.length===0)return <RouteError error={loadError} onRetry={retryLoad} compact={false}/>;
+
   return(
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 fade-up">
         <div>
           <h1 className="section-title">לוח חדרים</h1>
           <p className="text-gray-400 text-sm mt-1">
-            {DAYS_HE[now.getDay()]} {now.getDate()} {MONTHS_HE[now.getMonth()]} ·{' '}
+            יום {DAYS_HE[now.getDay()]}, {now.getDate()} ב{MONTHS_HE[now.getMonth()]} ·{' '}
             <span className="text-green-600 font-medium">{activeCount}</span> מתוך {rooms.length} חדרים פעילים
           </p>
         </div>
@@ -812,26 +836,30 @@ export default function DashboardPage(){
               <CalendarDays size={14}/> יומן שבועי
             </button>
           </div>
-          <button onClick={fetchData} className="btn-ghost p-2 text-gray-400">
+          <button onClick={()=>fetchData(true)} className="btn-ghost p-2 text-gray-400">
             <RefreshCw size={14}/>
           </button>
         </div>
       </div>
 
+      {denied&&<div role="alert" className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-4 text-sm">
+        <span>{ADMIN_ONLY_MESSAGE}</span>
+        <button onClick={clearDenied} aria-label="סגירת הודעה" className="btn-ghost p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={16}/></button>
+      </div>}
       {loading?<div className="text-center text-gray-400 py-20">טוען...</div>:(
         <>
           <WhoIsIn slots={slots}/>
           {view==='grid'?(
             rooms.length===0
-              ?<div className="text-center text-gray-400 py-20">אין חדרים. הוסף חדרים בפאנל המנהל.</div>
+              ?<div className="text-center text-gray-400 py-20">אין חדרים. אפשר להוסיף חדרים בהגדרות המנהל.</div>
               :<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {rooms.map((room,i)=><RoomCard key={room.id} room={room} slots={slots} notes={notesPerRoom[room.id]||[]} index={i} onClick={()=>setModalRoom(room)}/>)}
               </div>
           ):view==='timeline'?<TimelineView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded} therapistColorMap={therapistColorMap}/>:<WeeklyCalendarView rooms={rooms} slots={slots} onEnsureRange={ensureRangeLoaded} therapistColorMap={therapistColorMap}/>}
         </>
       )}
-      {modalRoom&&<RoomModal room={modalRoom} onClose={()=>setModalRoom(null)} onAddSlot={(r)=>setAddBookingRoom(r)}/>}
-      {addBookingRoom&&<AddBookingModal
+      {modalRoom&&<RoomModal room={modalRoom} memSlots={slots} isRangeLoaded={isRangeLoaded} onClose={()=>setModalRoom(null)} canAdd={isAdmin} onAddSlot={(r)=>{if(isAdmin)setAddBookingRoom(r);}}/>}
+      {isAdmin&&addBookingRoom&&<AddBookingModal
         room={addBookingRoom}
         therapists={therapists}
         onClose={()=>setAddBookingRoom(null)}
