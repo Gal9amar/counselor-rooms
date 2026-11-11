@@ -221,6 +221,13 @@ ADMIN_PASSWORD="your-admin-password"
 
 **Admin Auth:** Header `x-admin-password: [ADMIN_PASSWORD]`
 
+### מייל על בקשת שיבוץ חדשה
+- כל `POST /booking-requests` שולח מייל מעוצב (RTL) דרך Resend (`netlify/functions/lib/email.js`, fetch ישיר ל-API, בלי SDK) אל `BOOKING_NOTIFY_EMAIL` (ברירת מחדל gal9amar@gmail.com).
+- תפזורת = כמה בקשות; הלקוח שולח `scatterAll` (רשימת כל התאריכים) רק עם האחרונה, ולכן יוצא מייל אחד מסכם.
+- כישלון במייל נרשם ללוג ולא מכשיל את הבקשה. ללא `RESEND_API_KEY` המייל מדולג.
+- משתנים (גם ב-Netlify!): `RESEND_API_KEY`, אופציונלי `BOOKING_NOTIFY_EMAIL`, `RESEND_FROM`, `SITE_URL`.
+- **מגבלת Resend:** בלי דומיין מאומת השולח `onboarding@resend.dev` מורשה לשלוח רק לכתובת של בעל חשבון Resend. לשליחה ל-gal9amar@gmail.com יש לאמת דומיין ב-resend.com/domains ולהגדיר `RESEND_FROM` מהדומיין.
+
 ---
 
 ## עיצוב ו-UX
@@ -250,6 +257,8 @@ ADMIN_PASSWORD="your-admin-password"
 ---
 
 ## צוות סוכנים (`.claude/agents/`)
+
+**כלל קבוע (הוראת הבעלים):** בכל בקשת פיתוח חייבים להשתמש בסוכנים הרלוונטיים (לא לעבוד לבד): `rooms-manager` מנתב, מומחה התחום מממש, ושערי האיכות `sql-expert` (כל נגיעה ב-DB), `security-privacy` (endpoints/auth/חשיפת מידע/מיילים), `qa-verifier` (תמיד, לפני כל push) מאשרים לפני push.
 
 הסוכנים שמורים ב-git ולכן זמינים בכל clone. לשימוש מכל תיקייה במחשב: `powershell -File scripts/install-agents.ps1` (מעתיק ל-`~/.claude/agents`). נקודת כניסה: `rooms-manager`.
 

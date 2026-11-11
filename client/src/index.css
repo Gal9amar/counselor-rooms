@@ -298,3 +298,16 @@ body::before {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── New-booking page: fluid type scale + comfortable controls (scoped to .nb-root) ── */
+.nb-root .text-xs   { font-size: clamp(0.8125rem, 0.79rem + 0.10vw, 0.875rem); line-height: 1.55; }
+.nb-root .text-sm   { font-size: clamp(0.9375rem, 0.90rem + 0.15vw, 1rem);     line-height: 1.55; }
+.nb-root .text-base { font-size: clamp(1rem,      0.95rem + 0.20vw, 1.125rem); line-height: 1.5;  }
+.nb-root .text-lg   { font-size: clamp(1.125rem,  1.05rem + 0.30vw, 1.375rem); line-height: 1.4;  }
+.nb-root .text-2xl  { font-size: clamp(1.5rem,    1.30rem + 0.80vw, 2rem);     line-height: 1.25; }
+/* 16px minimum stops iOS Safari from zooming into fields; 44px minimum touch height */
+.nb-root select,
+.nb-root textarea,
+.nb-root input:not([type='radio']):not([type='checkbox']) { font-size: 1rem; min-height: 2.75rem; }
+.nb-root button { min-height: 2.75rem; }
+.nb-root button.btn-primary, .nb-root button.btn-secondary { font-size: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem); }

@@ -86,7 +86,7 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blo
   return (
     <div>
       <div className="grid grid-cols-7 mb-1">
-        {DAYS_HE.map(d => <div key={d} className="text-center text-xs text-gray-400 font-medium py-1">{d.slice(0,1)}</div>)}
+        {DAYS_HE.map(d => <div key={d} className="text-center text-xs text-gray-500 font-medium py-1">{d.slice(0,1)}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-1">
         {cells.map((day, i) => {
@@ -104,7 +104,7 @@ function MonthCalendar({ year, month, onSelectDate, slotDates, selectedDate, blo
             <button key={ds} disabled={isPast || isBlocked}
               onClick={() => !isPast && !isBlocked && onSelectDate(ds)}
               title={isBlocked ? 'חדר חסום' : isPartialBlocked ? 'חלק מהשעות חסומות' : ''}
-              className={`relative rounded-xl py-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5
+              className={`relative rounded-xl min-h-[44px] py-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5
                 ${isSelected   ? 'bg-green-500 text-white shadow-md shadow-green-200'
                 : isScatter    ? 'bg-blue-100 text-blue-700 border border-blue-300 ring-1 ring-blue-400'
                 : isBlocked    ? 'bg-red-100 text-red-400 border border-red-200 cursor-not-allowed'
@@ -161,7 +161,7 @@ const BOOKING_TYPES = [
     icon: CalendarDays,
     iconBg: 'bg-green-100',
     iconColor: 'text-green-600',
-    accentBg: 'bg-green-500',
+    accentBg: 'bg-green-700',
     accentLight: 'bg-green-50',
     accentText: 'text-green-700',
     accentBorder: 'border-green-200',
@@ -181,7 +181,7 @@ const BOOKING_TYPES = [
     icon: Repeat2,
     iconBg: 'bg-blue-100',
     iconColor: 'text-blue-600',
-    accentBg: 'bg-blue-500',
+    accentBg: 'bg-blue-700',
     accentLight: 'bg-blue-50',
     accentText: 'text-blue-700',
     accentBorder: 'border-blue-200',
@@ -201,7 +201,7 @@ const BOOKING_TYPES = [
     icon: CalendarRange,
     iconBg: 'bg-purple-100',
     iconColor: 'text-purple-600',
-    accentBg: 'bg-purple-500',
+    accentBg: 'bg-purple-700',
     accentLight: 'bg-purple-50',
     accentText: 'text-purple-700',
     accentBorder: 'border-purple-200',
@@ -443,7 +443,7 @@ export default function NewBookingPage() {
       if (scatterEntries.length === 0) { setError('יש לבחור לפחות תאריך אחד'); return; }
       setSaving(true);
       try {
-        for (const entry of scatterEntries) {
+        for (const [idx, entry] of scatterEntries.entries()) {
           await createBookingRequest({
             therapistName: therapistName,
             roomId: parseInt(roomId),
@@ -452,6 +452,8 @@ export default function NewBookingPage() {
             endHour: entry.endHour,
             note: note.trim() || undefined,
             bookingType: 'scatter',
+            // the last request carries the whole list so the owner gets a single summary email
+            ...(idx === scatterEntries.length - 1 ? { scatterAll: scatterEntries.map(({ date, startHour, endHour }) => ({ date, startHour, endHour })) } : {}),
           });
         }
         setStep('success');
@@ -484,17 +486,17 @@ export default function NewBookingPage() {
 
   // ── render ──
   return (
-    <div className="min-h-screen bg-gray-50" dir="rtl">
+    <div className="nb-root min-h-screen bg-gray-50" dir="rtl">
       {/* Top bar */}
       <div className="bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <img src="/logo-right.png" alt="מרכז אופק" className="h-8 w-auto object-contain" />
           <span className="text-sm font-semibold text-gray-600">בקשת שיבוץ חדר</span>
           <img src="/logo-left.png" alt="חוף אשקלון" className="h-8 w-auto object-contain" />
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 
         {/* ── SUCCESS ─────────────────────────────────────────── */}
         {step === 'success' && (
@@ -504,7 +506,7 @@ export default function NewBookingPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">הבקשה נשלחה!</h2>
             <p className="text-gray-500 mb-1">הבקשה שלך התקבלה בהצלחה</p>
-            <p className="text-gray-400 text-sm mb-8">המנהל יבדוק את הבקשה ויאשר את השיבוץ בהקדם</p>
+            <p className="text-gray-500 text-sm mb-8">המנהל יבדוק את הבקשה ויאשר את השיבוץ בהקדם</p>
             <button onClick={handleBackToTypes} className="btn-primary px-8 py-3 text-base">
               שלח בקשה נוספת
             </button>
@@ -531,7 +533,7 @@ export default function NewBookingPage() {
                       </div>
                       <div className="text-right flex-1">
                         <p className="font-bold text-white text-base leading-tight">{type.title}</p>
-                        <p className="text-xs text-white text-opacity-80 opacity-80">{type.subtitle}</p>
+                        <p className="text-xs text-white">{type.subtitle}</p>
                       </div>
                     </div>
 
@@ -566,7 +568,7 @@ export default function NewBookingPage() {
             {/* Back + title */}
             <div className="flex items-center gap-3 mb-4">
               <button onClick={handleBackToTypes}
-                className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-600 transition-colors">
                 <ChevronRight size={20} />
               </button>
               <div className="flex items-center gap-3">
@@ -577,7 +579,7 @@ export default function NewBookingPage() {
                 )}
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">{currentType?.title}</h2>
-                  <p className="text-xs text-gray-400">{currentType?.subtitle}</p>
+                  <p className="text-xs text-gray-500">{currentType?.subtitle}</p>
                 </div>
               </div>
             </div>
@@ -618,7 +620,7 @@ export default function NewBookingPage() {
             {/* שם + חדר — תמיד מוצגים */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
+                <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">1</span>
                 <span className="text-sm font-semibold text-gray-700">פרטי המבקש והחדר</span>
               </div>
               <div>
@@ -646,7 +648,7 @@ export default function NewBookingPage() {
                 {calStep === 'calendar' && (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                      <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
                       <label className="text-sm font-semibold text-gray-700">
                         {bookingType === 'recurring' ? 'תאריך התחלה לסדרה' : 'בחר תאריך'} <span className="text-red-400">*</span>
                       </label>
@@ -657,7 +659,7 @@ export default function NewBookingPage() {
                         <span>יש לבחור חדר תחילה כדי לראות זמינות</span>
                       </div>
                     ) : dataLoading ? (
-                      <p className="text-center text-gray-400 text-sm py-6">טוען זמינות...</p>
+                      <p className="text-center text-gray-500 text-sm py-6">טוען זמינות...</p>
                     ) : (
                       <>
                         <div className="flex items-center justify-between mb-4">
@@ -690,14 +692,14 @@ export default function NewBookingPage() {
                     {/* תאריך נבחר + חזור */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                        <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
                         <div>
                           <p className="text-sm font-semibold text-gray-700">{formatDateHe(selectedDate)}</p>
-                          {bookingType === 'recurring' && <p className="text-xs text-blue-500">תאריך התחלה לסדרה</p>}
+                          {bookingType === 'recurring' && <p className="text-xs text-blue-600">תאריך התחלה לסדרה</p>}
                         </div>
                       </div>
                       <button onClick={() => { setCalStep('calendar'); setStartHour(null); setEndHour(''); setError(''); }}
-                        className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+                        className="text-xs text-gray-500 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
                         שנה תאריך
                       </button>
                     </div>
@@ -711,10 +713,10 @@ export default function NewBookingPage() {
                     {/* שעות */}
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
+                        <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
                         <span className="text-sm font-semibold text-gray-700">שעות השיבוץ</span>
                       </div>
-                      <p className="text-xs text-gray-400 mb-3 mr-7">שעות תפוסות או חסומות לא ניתנות לבחירה</p>
+                      <p className="text-xs text-gray-500 mb-3 mr-8">שעות תפוסות או חסומות לא ניתנות לבחירה</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1.5">שעת התחלה <span className="text-red-400">*</span></label>
@@ -752,10 +754,10 @@ export default function NewBookingPage() {
                     {/* הערה */}
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">{bookingType === 'recurring' ? '4' : '4'}</span>
+                        <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">{bookingType === 'recurring' ? '4' : '4'}</span>
                         <label className="text-sm font-semibold text-gray-700">הערה <span className="text-red-400">*</span></label>
                       </div>
-                      <p className="text-xs text-gray-400 mb-2 mr-7">תיאור קצר של מטרת השיבוץ — יוצג למנהל</p>
+                      <p className="text-xs text-gray-500 mb-2 mr-8">תיאור קצר של מטרת השיבוץ — יוצג למנהל</p>
                       <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} maxLength={200}
                         placeholder="לדוגמה: פגישת ייעוץ, הערכה ראשונית, קבוצת תמיכה..."
                         className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 resize-none" />
@@ -765,7 +767,7 @@ export default function NewBookingPage() {
                     {bookingType === 'recurring' && (
                       <div className="border-t border-gray-100 pt-4 space-y-4">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold shrink-0">5</span>
+                          <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold shrink-0">5</span>
                           <span className="text-sm font-semibold text-gray-700">הגדרות הסדרה החוזרת</span>
                         </div>
 
@@ -787,12 +789,12 @@ export default function NewBookingPage() {
                         {recurFrequency === 'weekly' && (
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1">ימים בשבוע <span className="text-red-400">*</span></label>
-                            <p className="text-xs text-gray-400 mb-2">בחר אחד או יותר מהימים שבהם יחזור השיבוץ</p>
+                            <p className="text-xs text-gray-500 mb-2">בחר אחד או יותר מהימים שבהם יחזור השיבוץ</p>
                             <div className="flex gap-2">
                               {[0,1,2,3,4,5].map(day => (
                                 <button key={day} type="button"
                                   onClick={() => setRecurDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])}
-                                  className={`w-9 h-9 rounded-full text-sm font-bold border transition-all ${
+                                  className={`w-11 h-11 rounded-full text-sm font-bold border transition-all ${
                                     recurDays.includes(day) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
                                   }`}>{DAYS_SHORT[day]}</button>
                               ))}
@@ -803,7 +805,7 @@ export default function NewBookingPage() {
                         {/* סיום */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-1">מתי מסתיימת הסדרה?</label>
-                          <p className="text-xs text-gray-400 mb-2">ניתן לקבוע לפי מספר פגישות או לפי תאריך אחרון</p>
+                          <p className="text-xs text-gray-500 mb-2">ניתן לקבוע לפי מספר פגישות או לפי תאריך אחרון</p>
                           <div className="flex gap-3 mb-3">
                             {['occurrences','date'].map(mode => (
                               <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
@@ -855,10 +857,10 @@ export default function NewBookingPage() {
                 {/* הערה */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                    <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">2</span>
                     <label className="text-sm font-semibold text-gray-700">הערה <span className="text-red-400">*</span></label>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2 mr-7">תיאור קצר שיחול על כל השיבוצים ברשימה</p>
+                  <p className="text-xs text-gray-500 mb-2 mr-8">תיאור קצר שיחול על כל השיבוצים ברשימה</p>
                   <input value={note} onChange={e => setNote(e.target.value)} maxLength={200}
                     placeholder="לדוגמה: פגישות ייעוץ, קבוצת תמיכה..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
@@ -866,7 +868,7 @@ export default function NewBookingPage() {
 
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="w-5 h-5 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
+                    <span className="w-6 h-6 rounded-full bg-gray-800 text-white text-xs flex items-center justify-center font-bold shrink-0">3</span>
                     <span className="text-sm font-semibold text-gray-700">בחר ימים ושעות</span>
                   </div>
                   {!roomId ? (
@@ -878,7 +880,7 @@ export default function NewBookingPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       {/* לוח */}
                       <div>
-                        <p className="text-xs text-gray-400 mb-2">לחץ על יום להוספה — לחיצה שנייה מסירה אותו</p>
+                        <p className="text-xs text-gray-500 mb-2">לחץ על יום להוספה — לחיצה שנייה מסירה אותו</p>
                         <div className="flex items-center justify-between mb-3">
                           <button onClick={nextScatMonth} className="p-1.5 rounded-lg hover:bg-gray-100">
                             <ChevronRight size={18} className="text-gray-500" />
@@ -889,7 +891,7 @@ export default function NewBookingPage() {
                           </button>
                         </div>
                         {dataLoading ? (
-                          <p className="text-center text-gray-400 py-6 text-sm">טוען זמינות...</p>
+                          <p className="text-center text-gray-500 py-6 text-sm">טוען זמינות...</p>
                         ) : (
                           <MonthCalendar year={scatterYear} month={scatterMonth}
                             onSelectDate={handleScatterDateClick}
@@ -903,9 +905,9 @@ export default function NewBookingPage() {
                         {pendingDate && (
                           <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
                             <p className="text-sm font-semibold text-amber-800 mb-1">{formatDateHe(pendingDate)}</p>
-                            <p className="text-xs text-amber-600 mb-3">בחר שעות לתאריך זה ואז לחץ "הוסף לרשימה"</p>
+                            <p className="text-xs text-amber-700 mb-3">בחר שעות לתאריך זה ואז לחץ "הוסף לרשימה"</p>
                             {(occupiedHoursForPending.size > 0 || blockedHoursForPending.size > 0) && (
-                              <p className="text-xs text-orange-600 mb-2">⚠️ חלק מהשעות תפוסות/חסומות ולא ניתנות לבחירה</p>
+                              <p className="text-xs text-orange-700 mb-2">⚠️ חלק מהשעות תפוסות/חסומות ולא ניתנות לבחירה</p>
                             )}
                             <div className="grid grid-cols-2 gap-2 mb-3">
                               <div>
@@ -955,9 +957,9 @@ export default function NewBookingPage() {
                             <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full">{scatterEntries.length}</span>
                           )}
                         </h3>
-                        <p className="text-xs text-gray-400 mb-3">כל תאריך עם שעות שונות — ניתן להסיר בלחיצה על ✕</p>
+                        <p className="text-xs text-gray-500 mb-3">כל תאריך עם שעות שונות — ניתן להסיר בלחיצה על ✕</p>
                         {scatterEntries.length === 0 ? (
-                          <div className="text-gray-400 text-sm text-center py-8 flex-1 flex flex-col items-center justify-center gap-2 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                          <div className="text-gray-500 text-sm text-center py-8 flex-1 flex flex-col items-center justify-center gap-2 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                             <CalendarRange size={24} className="text-gray-300" />
                             <span>לחץ על יום בלוח להוספה</span>
                           </div>
