@@ -36,3 +36,8 @@ SPEC.md
 
 # Setup scripts (local use only)
 setup.sh
+
+# Impeccable design skill (local tooling, not part of the app) and local Claude settings
+.claude/skills/impeccable/
+.claude/agents/impeccable-*.md
+.claude/settings.local.json
