@@ -76,6 +76,37 @@
   to = "/.netlify/functions/booking-requests/:splat"
   status = 200
 
+# Local dev (netlify dev proxies to Vite): let Vite serve its own module paths instead of the SPA fallback below.
+[[redirects]]
+  from = "/@vite/*"
+  to = "/@vite/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/@react-refresh"
+  to = "/@react-refresh"
+  status = 200
+
+[[redirects]]
+  from = "/@id/*"
+  to = "/@id/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/@fs/*"
+  to = "/@fs/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/src/*"
+  to = "/src/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/node_modules/*"
+  to = "/node_modules/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
