@@ -226,7 +226,7 @@ ADMIN_PASSWORD="your-admin-password"
 - תפזורת = כמה בקשות; הלקוח שולח `scatterAll` (רשימת כל התאריכים) רק עם האחרונה, ולכן יוצא מייל אחד מסכם.
 - כישלון במייל נרשם ללוג ולא מכשיל את הבקשה. ללא `RESEND_API_KEY` המייל מדולג.
 - משתנים (גם ב-Netlify!): `RESEND_API_KEY`, אופציונלי `BOOKING_NOTIFY_EMAIL`, `RESEND_FROM`, `SITE_URL`.
-- **מגבלת Resend:** בלי דומיין מאומת השולח `onboarding@resend.dev` מורשה לשלוח רק לכתובת של בעל חשבון Resend. לשליחה ל-gal9amar@gmail.com יש לאמת דומיין ב-resend.com/domains ולהגדיר `RESEND_FROM` מהדומיין.
+- **שולח:** הדומיין `hamanulan.com` מאומת ב-Resend (נבדק 2026-11-11), והשולח ברירת המחדל הוא `requests@hamanulan.com`. ב-Netlify חובה להגדיר לפחות `RESEND_API_KEY`. (בלי דומיין מאומת Resend שולח רק לבעל החשבון.)
 
 ---
 

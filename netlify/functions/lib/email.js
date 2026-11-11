@@ -3,7 +3,7 @@
 //      SITE_URL (optional, used for the "open admin" button).
 
 const DEFAULT_TO = 'gal9amar@gmail.com';
-const DEFAULT_FROM = 'מרכז אופק - בקשות שיבוץ <onboarding@resend.dev>';
+const DEFAULT_FROM = 'מרכז אופק - בקשות שיבוץ <requests@hamanulan.com>';
 const DEFAULT_SITE = 'https://treatmentrooms.netlify.app';
 
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
