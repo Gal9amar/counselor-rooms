@@ -37,13 +37,12 @@ exports.handler = async (event) => {
     if (httpMethod === 'DELETE' && isIdPath) {
       if (!checkAdmin(headers)) return err('Unauthorized', 401);
       const tid = parseInt(id);
-      const slotCount = await prisma.scheduleSlot.count({ where: { therapistId: tid } });
-      // Delete slots first, then therapist
-      if (slotCount > 0) {
-        await prisma.scheduleSlot.deleteMany({ where: { therapistId: tid } });
-      }
-      await prisma.therapist.delete({ where: { id: tid } });
-      return ok({ success: true, deletedSlots: slotCount });
+      // Atomic: slots first, then therapist; deleteMany already reports how many rows it removed.
+      const [deletedSlots] = await prisma.$transaction([
+        prisma.scheduleSlot.deleteMany({ where: { therapistId: tid } }),
+        prisma.therapist.delete({ where: { id: tid } }),
+      ]);
+      return ok({ success: true, deletedSlots: deletedSlots.count });
     }
 
     return err('Method not allowed', 405);

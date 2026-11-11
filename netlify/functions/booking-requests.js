@@ -71,10 +71,11 @@ exports.handler = async (event) => {
         const finalTherapistName = therapistName || reqRecord.therapistName;
 
         // מצא או צור therapist לפי שם
-        let therapist = await prisma.therapist.findFirst({ where: { name: finalTherapistName } });
-        if (!therapist) {
-          therapist = await prisma.therapist.create({ data: { name: finalTherapistName } });
-        }
+        const therapist = await prisma.therapist.upsert({
+          where: { name: finalTherapistName },
+          update: {},
+          create: { name: finalTherapistName },
+        });
 
         // אישור שיבוץ חוזר
         if (reqRecord.bookingType === 'recurring' && reqRecord.recurFrequency) {

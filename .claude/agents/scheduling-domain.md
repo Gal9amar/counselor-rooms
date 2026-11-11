@@ -15,7 +15,7 @@ You own the business rules of counselor-rooms. Reply to the user in Hebrew. Veri
 - **Recurring**: `generateDates` supports `weekly` (daysOfWeek 0=Sunday..5=Friday), `daily`, `monthly`; caps: 5 years, 365 occurrences by default. `yearly` appears in schema comments but generates nothing - treat as unsupported.
 - **Deleting slots**: `scope` = `single` | `all` (the whole series, then the `RecurringSchedule`) as implemented; check whether `future` is really implemented before relying on it.
 - **Booking request approval**: finds or creates the Therapist by name, then creates slot(s); recurring approval creates `RecurringSchedule` + slots (same as POST /recurring). Status flows `pending -> approved|rejected`.
-- Deleting a room cascades `BookingRequest` and `RoomNote`; `ScheduleSlot` is deleted manually in `rooms.js`; `RecurringSchedule` has no FK to Room/Therapist (orphan risk).
+- Deleting a room cascades `BookingRequest`, `RoomNote` and (in the DB) `RecurringSchedule`; `ScheduleSlot` is deleted explicitly in the same transaction in `rooms.js`. Deleting a therapist with a recurring series fails on the DB FK (RESTRICT) - handle it in the API. `schema.prisma` does not declare the RecurringSchedule relations although the DB has them.
 
 ## History lessons (do not reintroduce)
 - Approving a request that overlaps an existing slot must return a clear conflict (was a bug); warn when a booking overlaps pending requests (feature).

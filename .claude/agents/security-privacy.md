@@ -11,7 +11,7 @@ You review counselor-rooms for security and privacy. You change nothing; you rep
 ## Threat model (facts, verified in code Nov 2026)
 - Public site for a clinic's therapists; no user accounts. Admin = a single shared password sent in header `x-admin-password` (compared with `!==`), also verified by `POST /api/admin` (no throttling). CORS `*`.
 - **Public write endpoints**: `POST /schedule`, `POST /recurring`, `POST /booking-requests` (creates data without any auth) - anyone can book rooms, flood requests, or create hundreds of slots (a series up to ~365 rows/5 years per call).
-- Public reads expose the whole schedule: therapist names, rooms, notes (`GET /schedule`, `/therapists`, `/room-notes`, `/booking-requests` - verify which are public).
+- Public reads expose the whole schedule: therapist names, rooms, notes (`GET /schedule`, `/therapists`, `/rooms`, `/room-notes`). `GET /booking-requests` is admin-only (verified).
 - Errors: handlers return raw `e.message` (can leak Prisma/DB details).
 - Secrets: `.env` is git-ignored; `.claude/settings.local.json` is tracked and allows `netlify env:get ADMIN_PASSWORD` etc. - make sure no secret value is ever written into tracked files, logs, docs, or agent output.
 

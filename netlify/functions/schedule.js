@@ -46,38 +46,39 @@ exports.handler = async (event) => {
       const dateUTC = toMidnightUTC(date);
 
       // Check blocking room notes
-      const blockingNote = await prisma.roomNote.findFirst({
-        where: {
-          roomId,
-          blocksBooking: true,
-          startDate: { lte: dateUTC },
-          endDate: { gte: dateUTC },
-          OR: [
-            { startHour: null },
-            { AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
-          ],
-        },
-      });
+      // The three checks are independent: run them in one round-trip wave, then decide in the same order as before.
+      const [blockingNote, overlapping, pendingConflicts] = await Promise.all([
+        prisma.roomNote.findFirst({
+          where: {
+            roomId,
+            blocksBooking: true,
+            startDate: { lte: dateUTC },
+            endDate: { gte: dateUTC },
+            OR: [
+              { startHour: null },
+              { AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
+            ],
+          },
+        }),
+        prisma.scheduleSlot.findFirst({
+          where: { roomId, date: dateUTC, AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
+          include: { therapist: true },
+        }),
+        forcePending
+          ? Promise.resolve([])
+          : prisma.bookingRequest.findMany({
+              where: { roomId, date: dateUTC, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
+            }),
+      ]);
       if (blockingNote)
         return err(`החדר חסום: ${blockingNote.message}`, 409);
-
-      const overlapping = await prisma.scheduleSlot.findFirst({
-        where: { roomId, date: dateUTC, AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }] },
-        include: { therapist: true },
-      });
       if (overlapping)
         return err(`קיים שיבוץ חופף: ${overlapping.therapist.name} (${overlapping.startHour}:00–${overlapping.endHour}:00)`, 409);
-
-      if (!forcePending) {
-        const pendingConflicts = await prisma.bookingRequest.findMany({
-          where: { roomId, date: dateUTC, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
-        });
-        if (pendingConflicts.length > 0) {
-          return err(JSON.stringify({
-            pendingConflict: true,
-            conflicts: pendingConflicts.map(r => ({ therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
-          }), 409);
-        }
+      if (pendingConflicts.length > 0) {
+        return err(JSON.stringify({
+          pendingConflict: true,
+          conflicts: pendingConflicts.map(r => ({ therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
+        }), 409);
       }
 
       const slot = await prisma.scheduleSlot.create({

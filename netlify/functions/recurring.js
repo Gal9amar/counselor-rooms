@@ -39,14 +39,21 @@ exports.handler = async (event) => {
         return err('לא נמצאו תאריכים בטווח שהוגדר', 400);
 
       // Check conflicts for ALL dates in ONE query
-      const overlapping = await prisma.scheduleSlot.findMany({
-        where: {
-          roomId,
-          date: { in: dates },
-          AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
-        },
-        include: { therapist: true },
-      });
+      const [overlapping, pendingConflicts] = await Promise.all([
+        prisma.scheduleSlot.findMany({
+          where: {
+            roomId,
+            date: { in: dates },
+            AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
+          },
+          include: { therapist: true },
+        }),
+        forcePending
+          ? Promise.resolve([])
+          : prisma.bookingRequest.findMany({
+              where: { roomId, date: { in: dates }, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
+            }),
+      ]);
 
       if (overlapping.length > 0) {
         const conflicts = overlapping.map((s) => ({
@@ -58,16 +65,11 @@ exports.handler = async (event) => {
         return err(JSON.stringify({ conflicts }), 409);
       }
 
-      if (!forcePending) {
-        const pendingConflicts = await prisma.bookingRequest.findMany({
-          where: { roomId, date: { in: dates }, status: 'pending', startHour: { lt: endHour }, endHour: { gt: startHour } },
-        });
-        if (pendingConflicts.length > 0) {
-          return err(JSON.stringify({
-            pendingConflict: true,
-            conflicts: pendingConflicts.map(r => ({ date: toDateStr(new Date(r.date)), therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
-          }), 409);
-        }
+      if (pendingConflicts.length > 0) {
+        return err(JSON.stringify({
+          pendingConflict: true,
+          conflicts: pendingConflicts.map(r => ({ date: toDateStr(new Date(r.date)), therapistName: r.therapistName, startHour: r.startHour, endHour: r.endHour })),
+        }), 409);
       }
 
       // Create the RecurringSchedule record
@@ -186,19 +188,17 @@ exports.handler = async (event) => {
       } else {
         // Only room/therapist/hours/note changed — check conflicts on existing slot dates
         const seriesSlots = await prisma.scheduleSlot.findMany({ where: { recurringId: id } });
-        const conflicts = [];
-        for (const slot of seriesSlots) {
-          const overlapping = await prisma.scheduleSlot.findFirst({
-            where: {
-              id: { not: slot.id },
-              roomId,
-              date: slot.date,
-              AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
-            },
-            include: { therapist: true },
-          });
-          if (overlapping) conflicts.push({ date: toDateStr(new Date(slot.date)), therapist: overlapping.therapist.name });
-        }
+        // One query for the whole series (was one query per slot).
+        const overlappingSlots = seriesSlots.length === 0 ? [] : await prisma.scheduleSlot.findMany({
+          where: {
+            roomId,
+            date: { in: seriesSlots.map(s => s.date) },
+            AND: [{ startHour: { lt: endHour } }, { endHour: { gt: startHour } }],
+            NOT: { recurringId: id },
+          },
+          include: { therapist: true },
+        });
+        const conflicts = overlappingSlots.map(s => ({ date: toDateStr(new Date(s.date)), therapist: s.therapist.name }));
         if (conflicts.length > 0) return err(JSON.stringify({ conflicts }), 409);
 
         await prisma.recurringSchedule.update({
