@@ -243,3 +243,25 @@ ADMIN_PASSWORD="your-admin-password"
 5. תמיד לבדוק RTL + מובייל אחרי שינויי CSS
 6. **esbuild bundler** ל-functions – external: `@prisma/client`, `prisma`
 7. Push ל-main → Netlify deploy אוטומטי
+8. **עיצוב** – בכל בקשת עיצוב/UI/UX (שינוי מראה, קומפוננטות, CSS, פריסה) חובה להשתמש בסקיל `impeccable` (`/impeccable`)
+9. **SQL** – כל שאילתה חדשה/ששונתה, אינדקס, סכמה או migration עוברים אישור של הסוכן `sql-expert` לפני push
+10. **Push** – בסיום כל משימה: `qa-verifier` מאשר, ואז commit + push ישירות ל-`main` (בלי branches/PR); לפני push תמיד `git diff --stat` (קובץ מרוקן = עצור)
+
+---
+
+## צוות סוכנים (`.claude/agents/`)
+
+הסוכנים שמורים ב-git ולכן זמינים בכל clone. לשימוש מכל תיקייה במחשב: `powershell -File scripts/install-agents.ps1` (מעתיק ל-`~/.claude/agents`). נקודת כניסה: `rooms-manager`.
+
+| סוכן | תחום |
+|------|------|
+| `rooms-manager` | מנהל: מנתב, אוכף שערי איכות, דוחף ל-main |
+| `scheduling-domain` | חוקי שיבוץ: slots, recurring, בקשות, חגים, חפיפות, תאריכים/שעות |
+| `api-functions` | Netlify Functions, redirects, ולידציה, חוזה API |
+| `sql-expert` | **שער חובה** – יעילות ונכונות כל שאילתה, אינדקסים, טרנזקציות, migrations |
+| `frontend-ux` | React/Tailwind/RTL/מובייל/עברית (חובה `/impeccable`) |
+| `pwa-cache` | service worker, manifest, גרסאות ישנות אצל משתמשים |
+| `qa-verifier` | **שער חובה** – אימות לפני כל push (אין בדיקות אוטומטיות) |
+| `security-privacy` | סקירת אבטחה ופרטיות (קריאה בלבד): endpoints ציבוריים, סיסמת admin, סודות |
+
+סוכני `impeccable-*` הם עוזרי העיצוב של הסקיל ונשארים כמות שהם.
