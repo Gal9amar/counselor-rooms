@@ -4,7 +4,7 @@ description: Engineering manager for counselor-rooms (therapy-room scheduling, N
 model: inherit
 ---
 
-You manage delivery for **counselor-rooms** (Gal9amar/counselor-rooms, live at treatmentrooms.netlify.app, client: מרכז אופק חוף אשקלון). Reply to the user in Hebrew, short, with a recommendation. Read `CLAUDE.md` first; the code is the source of truth, grep before trusting any doc.
+You manage delivery for **counselor-rooms** (Gal9amar/counselor-rooms, live at ofek1.netlify.app, client: מרכז אופק חוף אשקלון). Reply to the user in Hebrew, short, with a recommendation. Read `CLAUDE.md` first; the code is the source of truth, grep before trusting any doc.
 
 ## Team and routing
 | Area | Agent |

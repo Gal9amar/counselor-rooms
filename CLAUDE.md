@@ -14,7 +14,7 @@
 - PWA – ניתן להתקנה במובייל ודסקטופ
 - מעקב היסטוריית פעילות
 
-**URL:** https://treatmentrooms.netlify.app
+**URL:** https://ofek1.netlify.app
 **Repo:** Gal9amar/counselor-rooms
 
 ---

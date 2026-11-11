@@ -4,7 +4,7 @@
 
 const DEFAULT_TO = 'gal9amar@gmail.com';
 const DEFAULT_FROM = 'מרכז אופק - בקשות שיבוץ <requests@hamanulan.com>';
-const DEFAULT_SITE = 'https://treatmentrooms.netlify.app';
+const DEFAULT_SITE = 'https://ofek1.netlify.app';
 
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const MONTHS_HE = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
@@ -51,7 +51,7 @@ function buildEmail(request, scatter, siteUrl) {
   const rows = rowsFor(request, scatter);
   const when = scatter ? `${scatter.length} תאריכים` : dateHe(request.date);
   const subject = clean(`בקשת שיבוץ חדשה – ${request.therapistName} · ${request.room?.name || 'חדר'} · ${when}`, 150);
-  const adminUrl = `${siteUrl.replace(/\/$/, '')}/admin`;
+  const adminUrl = `${siteUrl.replace(/\/$/, '')}/admin?tab=requests`; // opens the requests tab directly
 
   const rowHtml = rows.map(([label, value], i) => {
     const val = Array.isArray(value)

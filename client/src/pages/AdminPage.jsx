@@ -128,7 +128,9 @@ export default function AdminPage(){
   const [authed,setAuthed]=useState(!!sessionStorage.getItem('adminPass'));
   const [password,setPassword]=useState('');
   const [authError,setAuthError]=useState('');
-  const [tab,setTab]=useState('rooms');
+  const [tab,setTab]=useState(()=>{ // /admin?tab=requests (used by the notification email) opens that tab
+    try{ const t=new URLSearchParams(window.location.search).get('tab'); return ['rooms','therapists','schedule','requests'].includes(t)?t:'rooms'; }catch{ return 'rooms'; }
+  });
   const [rooms,setRooms]=useState([]);
   const [therapists,setTherapists]=useState([]);
   const [slots,setSlots]=useState([]);
